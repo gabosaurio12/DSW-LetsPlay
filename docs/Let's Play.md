@@ -1,28 +1,26 @@
-# Let's Play
-
-## Objetivo general
+## Objetivo general (Leo)
 
 ### Objetivos específicos
 
-## Alcance
+## Alcance (Seth)
 
 ### Límites de la primera versión
 
-## Interesados
+## Interesados (Gabo)
 
 ### Usuarios objetivo
 
-## Etapas de desarrollo
+## Etapas de desarrollo (Leo)
 
 > Incluir los entregables de cada etapa
 > Esta sección ya está en definida en la primera entrega en eminus
 
-## Recursos disponibles
+## Recursos disponibles (Gabo)
 
 ### Humanos
 
 ### Técnicos
 
-## Riesgos y restricciones
+## Riesgos y restricciones (Leo)
 
 
