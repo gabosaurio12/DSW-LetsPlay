@@ -5,15 +5,14 @@
 
 ## Actores
 
-- **Persona:** persona que desea registrarse en la plataforma.
-- **Usuario registrado:** usuario con una cuenta activa.
-- **Jugador:** usuario registrado que solicita videojuegos para el catálogo.
+- **Usuario:** persona que utiliza o desea utilizar la plataforma.
+- **Jugador:** usuario que solicita videojuegos para el catálogo.
 - **Administrador del grupo:** usuario encargado de administrar un grupo.
 - **Administrador de la plataforma:** usuario que revisa videojuegos y reportes.
 
 ## CU-01 — Registrar usuario
 
-**Actor principal:** Persona  
+**Actor principal:** Usuario  
 **Objetivo:** Crear una cuenta en Let's Play.
 
 **Precondiciones:** La persona no debe tener una cuenta registrada con el mismo correo o nombre de usuario.
@@ -37,7 +36,7 @@
 
 ## CU-02 — Iniciar sesión
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Acceder a las funciones de la plataforma.
 
 **Flujo principal:**
@@ -57,7 +56,7 @@
 
 ## CU-03 — Cerrar sesión
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Finalizar la sesión activa.
 
 **Flujo principal:**
@@ -70,7 +69,7 @@
 
 ## CU-04 — Cambiar contraseña
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Sustituir la contraseña actual.
 
 **Precondiciones:** El usuario debe tener una sesión activa.
@@ -92,7 +91,7 @@
 
 ## CU-05 — Recuperar contraseña
 
-**Actor principal:** Usuario que no puede acceder a su cuenta  
+**Actor principal:** Usuario  
 **Objetivo:** Restablecer el acceso a la cuenta.
 
 **Flujo principal:**
@@ -113,7 +112,7 @@
 
 ## CU-06 — Consultar y actualizar perfil
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Consultar y actualizar la información del perfil.
 
 **Flujo principal:**
@@ -134,7 +133,7 @@
 
 ## CU-07 — Eliminar cuenta
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Eliminar la cuenta propia.
 
 **Flujo principal:**
@@ -154,7 +153,7 @@
 
 ## CU-08 — Crear grupo
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Crear una comunidad pública o privada relacionada con videojuegos.
 
 **Flujo principal:**
@@ -196,7 +195,7 @@
 
 ## CU-10 — Unirse a un grupo público
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Convertirse en integrante de un grupo público.
 
 **Flujo principal:**
@@ -209,7 +208,7 @@
 
 ## CU-11 — Solicitar ingreso a grupo privado
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Solicitar acceso a un grupo privado.
 
 **Flujo principal:**
@@ -240,7 +239,7 @@
 
 ## CU-13 — Abandonar o eliminar integrantes de un grupo
 
-**Actor principal:** Usuario registrado / Administrador del grupo  
+**Actor principal:** Usuario / Administrador del grupo  
 **Objetivo:** Gestionar la membresía del grupo.
 
 **Flujos:**
@@ -308,21 +307,20 @@
 
 ## CU-17 — Reportar contenido o usuario
 
-**Actor principal:** Usuario registrado  
+**Actor principal:** Usuario  
 **Objetivo:** Informar al administrador sobre contenido o comportamiento que deba revisarse.
-
-> Este caso de uso es una base inicial porque el formulario de reportes todavía no está definido.
 
 **Flujo principal:**
 
 1. El usuario selecciona la opción “Reportar” en una publicación, comentario, perfil o grupo.
 2. El sistema muestra el formulario de reporte.
-3. El usuario selecciona el motivo y agrega una descripción opcional.
-4. El usuario envía el reporte.
-5. El sistema valida y registra el reporte con estado pendiente.
-6. El sistema confirma el envío al usuario.
+3. El usuario selecciona el tipo de contenido, el motivo y agrega una descripción.
+4. El usuario adjunta evidencia opcional.
+5. El usuario envía el reporte.
+6. El sistema valida y registra el reporte con estado pendiente.
+7. El sistema confirma el envío al usuario.
 
-**Datos por definir:** Tipos de contenido reportable, motivos disponibles, obligatoriedad de la descripción y posibilidad de adjuntar evidencias.
+**Datos por definir:** Motivos disponibles, formatos y tamaño máximo de evidencias.
 
 ## CU-18 — Revisar reporte
 
@@ -339,4 +337,26 @@
 **Alcance excluido:** Este caso de uso no contempla suspensiones, bloqueos, eliminación de cuentas ni ninguna otra sanción.
 
 **Datos por definir:** Estados finales permitidos, comentarios del administrador y notificación al usuario que realizó el reporte.
+
+## CU-19 — Crear publicación
+
+**Actor principal:** Usuario  
+**Objetivo:** Crear una publicación general o una publicación dentro de un grupo.
+
+**Flujo principal:**
+
+1. El usuario abre el formulario de publicación.
+2. El usuario captura el texto y agrega una imagen opcional.
+3. El usuario selecciona un videojuego relacionado.
+4. Si la publicación pertenece a un grupo, el sistema muestra únicamente los videojuegos relacionados con ese grupo.
+5. El usuario envía la publicación.
+6. El sistema valida la información.
+7. El sistema guarda la publicación asociada al usuario, al videojuego y, si corresponde, al grupo.
+8. El sistema muestra la publicación.
+
+**Flujos alternos:**
+
+- **3.1.** Si el usuario no selecciona un videojuego, el sistema no permite publicar.
+- **4.1.** Si el videojuego no pertenece al grupo seleccionado, el sistema rechaza la publicación.
+- **6.1.** Si falta información obligatoria, el sistema solicita completarla.
 

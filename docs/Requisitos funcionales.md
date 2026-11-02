@@ -5,8 +5,8 @@
 
 ## 1. Actores
 
-- **Usuario registrado:** persona con una cuenta activa en la plataforma.
-- **Jugador:** usuario registrado que utiliza la plataforma y puede solicitar el registro de un videojuego.
+- **Usuario:** persona que utiliza o desea utilizar la plataforma.
+- **Jugador:** usuario que puede solicitar el registro de un videojuego.
 - **Administrador del grupo:** usuario que creó un grupo o que tenga permisos de administración dentro de él.
 - **Administrador de la plataforma:** usuario responsable de revisar y resolver las solicitudes de registro de nuevos videojuegos.
 - **Sistema:** aplicación web responsable de validar, procesar y almacenar la información.
@@ -18,7 +18,10 @@
 | RF-01 | El sistema deberá permitir que una persona cree una cuenta de usuario. | Alta |
 | RF-02 | El sistema deberá solicitar y validar los datos necesarios para registrar una cuenta. | Alta |
 | RF-03 | El sistema deberá impedir el registro de una cuenta con datos obligatorios inválidos o ya utilizados, cuando corresponda. | Alta |
-| RF-04 | El sistema deberá permitir que un usuario registrado inicie sesión con sus credenciales. | Alta |
+| RF-90 | El sistema deberá permitir registrar la fecha de nacimiento del usuario. | Alta |
+| RF-91 | El sistema deberá permitir registrar el género del usuario mediante una opción definida por el proyecto. | Alta |
+| RF-92 | El sistema deberá validar que el nombre de usuario tenga máximo 12 caracteres alfanuméricos. | Alta |
+| RF-04 | El sistema deberá permitir que un usuario inicie sesión con sus credenciales. | Alta |
 | RF-05 | El sistema deberá validar las credenciales antes de conceder acceso a las funciones privadas. | Alta |
 | RF-06 | El sistema deberá permitir que un usuario cierre su sesión. | Media |
 | RF-07 | El sistema deberá restringir las funciones que requieren autenticación a usuarios con una sesión válida. | Alta |
@@ -44,7 +47,7 @@
 
 | ID | Requisito | Prioridad |
 |---|---|---|
-| RF-13 | El sistema deberá permitir que un usuario registrado cree una publicación relacionada con videojuegos. | Alta |
+| RF-13 | El sistema deberá permitir que un usuario cree una publicación relacionada con un videojuego. | Alta |
 | RF-14 | El sistema deberá permitir que una publicación contenga texto. | Alta |
 | RF-15 | El sistema deberá permitir que una publicación contenga una imagen. | Alta |
 | RF-16 | El sistema deberá validar que la información obligatoria de una publicación esté completa antes de guardarla. | Alta |
@@ -85,10 +88,10 @@
 
 | ID | Requisito | Prioridad |
 |---|---|---|
-| RF-33 | El sistema deberá permitir que un usuario registrado indique que le gusta una publicación. | Alta |
+| RF-33 | El sistema deberá permitir que un usuario indique que le gusta una publicación. | Alta |
 | RF-34 | El sistema deberá permitir que un usuario retire su reacción de me gusta de una publicación. | Media |
 | RF-35 | El sistema deberá mostrar el estado y/o cantidad de reacciones de una publicación. | Media |
-| RF-36 | El sistema deberá permitir que un usuario registrado agregue un comentario a una publicación. | Alta |
+| RF-36 | El sistema deberá permitir que un usuario agregue un comentario a una publicación. | Alta |
 | RF-37 | El sistema deberá mostrar los comentarios asociados a una publicación. | Alta |
 | RF-38 | El sistema deberá asociar cada comentario con el usuario que lo realizó y registrar su fecha de creación. | Alta |
 | RF-39 | El sistema deberá permitir compartir una publicación, si esta funcionalidad se mantiene en el alcance final. | Media |
@@ -98,14 +101,14 @@
 
 | ID | Requisito | Prioridad |
 |---|---|---|
-| RF-41 | El sistema deberá permitir que un usuario registrado cree un grupo relacionado con uno o varios videojuegos disponibles en la plataforma. | Alta |
+| RF-41 | El sistema deberá permitir que un usuario cree un grupo relacionado con uno o varios videojuegos disponibles en la plataforma. | Alta |
 | RF-42 | El sistema deberá permitir que el creador defina si el grupo será público o privado. | Alta |
 | RF-43 | El sistema deberá solicitar y validar los datos obligatorios del grupo antes de crearlo. | Alta |
 | RF-44 | El sistema deberá asociar cada grupo con el usuario que lo creó. | Alta |
 | RF-45 | El sistema deberá mantener la relación entre cada grupo y uno o varios videojuegos. | Alta |
 | RF-46 | El sistema deberá permitir que un usuario consulte los grupos públicos disponibles. | Media |
 | RF-47 | El sistema deberá permitir que un usuario se una directamente a un grupo público. | Alta |
-| RF-48 | El sistema deberá permitir que un usuario solicite unirse a un grupo privado, de acuerdo con las reglas definidas por el administrador del grupo. | Alta |
+| RF-48 | El sistema deberá permitir que un usuario solicite unirse a un grupo privado y deberá requerir la aprobación del administrador del grupo para conceder el acceso. | Alta |
 | RF-49 | El sistema deberá permitir que un usuario abandone un grupo al que pertenece. | Alta |
 | RF-50 | El sistema deberá permitir que el administrador del grupo gestione las solicitudes de ingreso a un grupo privado. | Media |
 | RF-51 | El sistema deberá permitir que el administrador del grupo elimine a un integrante. | Media |
@@ -115,16 +118,21 @@
 | RF-55 | El sistema deberá restringir las publicaciones de un grupo privado a sus integrantes autorizados. | Alta |
 | RF-56 | El sistema deberá impedir que un usuario sin permisos administre un grupo o acceda al contenido privado de un grupo. | Alta |
 | RF-57 | El sistema deberá permitir que el administrador del grupo actualice la información y configuración del grupo, sin administrar la página del videojuego relacionado. | Alta |
-| RF-84 | El sistema deberá exigir que todo grupo, público o privado, se relacione inicialmente con un mínimo de 1 y un máximo de 5 videojuegos aprobados. | Alta |
-| RF-85 | El sistema deberá permitir que el administrador de cualquier grupo agregue, elimine o edite los videojuegos relacionados, manteniendo siempre entre 1 y 5 videojuegos asociados. | Alta |
-| RF-86 | El sistema deberá permitir que una publicación dentro de cualquier grupo no tenga un videojuego específico seleccionado. | Alta |
-| RF-87 | Si una publicación dentro de un grupo especifica un videojuego, el sistema deberá validar que pertenezca a los videojuegos relacionados con ese grupo. | Alta |
+| RF-84 | El sistema deberá exigir que todo grupo se relacione inicialmente con un mínimo de 1 y un máximo de 5 videojuegos aprobados. | Alta |
+| RF-85 | El sistema deberá permitir que el administrador de un grupo agregue, elimine o edite los videojuegos relacionados, manteniendo siempre entre 1 y 5 videojuegos asociados. | Alta |
+| RF-86 | El sistema deberá exigir que toda publicación realizada dentro de un grupo seleccione un videojuego relacionado con ese grupo. | Alta |
+| RF-87 | El sistema deberá impedir que una publicación dentro de un grupo seleccione un videojuego que no esté relacionado con ese grupo. | Alta |
+| RF-93 | El sistema deberá permitir que un usuario registre un reporte sobre una publicación, comentario, perfil o grupo. | Media |
+| RF-94 | El sistema deberá solicitar el motivo y una descripción del reporte. | Media |
+| RF-95 | El sistema deberá registrar cada reporte con el usuario que lo creó, el contenido reportado, la fecha y el estado del reporte. | Alta |
+| RF-96 | El sistema deberá permitir que el administrador de la plataforma consulte los reportes pendientes. | Media |
+| RF-97 | El sistema deberá permitir que el administrador de la plataforma actualice el estado de un reporte sin aplicar sanciones. | Media |
 
 ## 9. Mensajería privada
 
 | ID | Requisito | Prioridad |
 |---|---|---|
-| RF-76 | El sistema deberá permitir que un usuario registrado envíe mensajes privados a otro usuario, si esta funcionalidad se mantiene en el alcance final. | Media |
+| RF-76 | El sistema deberá permitir que un usuario envíe mensajes privados a otro usuario, si esta funcionalidad se mantiene en el alcance final. | Media |
 | RF-77 | El sistema deberá permitir que los usuarios autorizados consulten sus conversaciones y mensajes privados. | Media |
 | RF-78 | El sistema deberá asociar cada mensaje con su remitente, destinatario y fecha de envío. | Media |
 
@@ -144,8 +152,8 @@ Los siguientes puntos aparecen en los documentos, pero requieren confirmación a
 
 1. **Compartir publicaciones:** aparece en el alcance, pero no en las prioridades ni en todos los criterios de finalización.
 2. **Mensajes privados:** aparece en los criterios de finalización, pero no en la lista principal de funcionalidades ni en los entregables.
-3. **Grupos:** ya se definió que podrán ser públicos o privados; queda pendiente decidir si los grupos privados requieren aprobación obligatoria o si el administrador puede aceptar automáticamente las solicitudes.
+3. **Grupos:** se definió que los grupos pueden tener visibilidad pública o privada y que el ingreso a un grupo privado requiere aprobación obligatoria.
 4. **Edición y eliminación de publicaciones, comentarios o imágenes:** no están descritas explícitamente en el alcance actual.
 5. **Verificación de correo:** no está descrita explícitamente y debe confirmarse antes de incluirla.
-6. **Tipos de usuario:** jugadores, desarrolladores y creadores de contenido están identificados como usuarios objetivo, pero el alcance indica que no habrá funcionalidades diferenciadas; por ello, en este borrador se consideran un mismo tipo de usuario registrado.
+6. **Tipos de usuario:** jugadores, desarrolladores y creadores de contenido están identificados como usuarios objetivo, pero el alcance indica que no habrá funcionalidades diferenciadas; por ello, en este borrador se consideran usuarios dentro de la misma plataforma.
 

@@ -14,7 +14,7 @@ La primera versión estará orientada a ofrecer las funcionalidades esenciales d
 - **Visualización de contenido:** mostrar las publicaciones disponibles en un feed principal.
 - **Interacciones sociales:** permitir dar me gusta, compartir y comentar las publicaciones de otros usuarios.
 - **Persistencia de datos:** almacenar usuarios, perfiles, publicaciones, comentarios y reacciones en una base de datos.
-- **Creacion de grupos** permitir la creacion de grupos para las comunidades con publicaciones privadas.
+- **Creación de grupos:** permitir la creación de grupos relacionados con uno o varios videojuegos. Los grupos podrán tener visibilidad pública o privada; en los grupos privados, el ingreso requiere aprobación y sus publicaciones solo son visibles para sus integrantes.
 
 
 ### Límites de la primera versión
@@ -55,7 +55,7 @@ Debido al tiempo disponible, las funcionalidades se implementarán de acuerdo co
 | Desarrollo | Módulo de perfiles | Consulta y edición de perfiles |
 | Desarrollo | Módulo de publicaciones | Creación y visualización de publicaciones de texto e imágenes |
 | Desarrollo | Módulo de interacciones | Funcionalidad de me gusta y comentarios |
-| Desarrollo | Módulo de grupos | Funcionalidad de creacion y eliminacion de grupos|
+| Desarrollo | Módulo de grupos | Funcionalidad de creación, edición, ingreso y eliminación de grupos públicos o privados |
 | Desarrollo | Base de datos integrada | Almacenamiento persistente de la información |
 | Pruebas | Informe de pruebas | Casos de prueba, resultados y errores identificados |
 | Entrega | Aplicación web funcional | Versión integrada de Let's Play |
@@ -70,7 +70,9 @@ Se considerará que la primera versión de *Let's Play* está terminada cuando s
 - Un usuario puede registrarse e iniciar sesión.
 - Un usuario puede consultar y editar su perfil.
 - Un usuario puede crear publicaciones de texto e imágenes.
+- Un usuario puede crear un grupo público o privado relacionado con entre 1 y 5 videojuegos.
 - Un usuario puede unirse, salir o ser eliminado de un grupo.
+- El ingreso a un grupo privado requiere aprobación del administrador del grupo.
 - Las publicaciones se almacenan y permanecen disponibles después de cerrar la sesión.
 - Los usuarios pueden visualizar las publicaciones en el feed principal.
 - Los usuarios pueden dar me gusta, comentar publicaciones e intercambiar mensajes privados.

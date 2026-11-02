@@ -7,7 +7,7 @@
 
 ## 1. Formulario de registro de usuario
 
-**Actor:** Persona que desea crear una cuenta.  
+**Actor:** Usuario.  
 **Objetivo:** Registrar un nuevo usuario en la plataforma.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
@@ -24,7 +24,7 @@
 
 ## 2. Formulario de inicio de sesión
 
-**Actor:** Usuario registrado.  
+**Actor:** Usuario.  
 **Objetivo:** Acceder a la plataforma.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
@@ -37,7 +37,7 @@
 
 ## 3. Formulario de perfil
 
-**Actor:** Usuario registrado.  
+**Actor:** Usuario.  
 **Objetivo:** Consultar y actualizar la información del perfil.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
@@ -60,7 +60,7 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 ## 4. Formulario de cambio de contraseña
 
-**Actor:** Usuario autenticado.  
+**Actor:** Usuario.  
 **Objetivo:** Cambiar la contraseña actual.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
@@ -74,7 +74,7 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 ## 5. Formulario de recuperación de contraseña
 
-**Actor:** Usuario que no puede acceder a su cuenta.  
+**Actor:** Usuario.  
 **Objetivo:** Solicitar la recuperación de la contraseña.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
@@ -86,12 +86,12 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 ## 6. Formulario de publicación
 
-**Actor:** Usuario registrado.  
+**Actor:** Usuario.  
 **Objetivo:** Crear una publicación relacionada con videojuegos.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Videojuego relacionado | `UUID` nullable | Condicional | En publicaciones generales es obligatorio. En publicaciones dentro de cualquier grupo puede omitirse; si se selecciona, debe pertenecer a los videojuegos relacionados con el grupo. |
+| Videojuego relacionado | `UUID` | Sí | En publicaciones dentro de un grupo debe pertenecer a los videojuegos relacionados con ese grupo. |
 | Texto | `TEXT` | **Por definir** | Debe respetar la longitud máxima definida. |
 | Imagen | `FILE/URL` | No | Formatos y tamaño máximo: **Por definir**. |
 | Visibilidad / grupo | `UUID` nullable | No | Identificador del grupo; aplicable si la publicación pertenece a un grupo. |
@@ -101,7 +101,7 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 ### Regla para publicaciones en grupos
 
-Cuando el usuario publique dentro de un grupo, no será obligatorio seleccionar un videojuego específico. Si decide seleccionar uno, el sistema deberá mostrar únicamente los videojuegos relacionados con ese grupo y validar que el videojuego elegido pertenezca a dicha relación. Esta regla es igual para grupos públicos y privados.
+Cuando el usuario publique dentro de un grupo, deberá seleccionar un videojuego relacionado con ese grupo. Esta regla es igual para todos los grupos, independientemente de su visibilidad pública o privada.
 
 ### Confirmación de eliminación de publicación
 
@@ -109,7 +109,7 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 ## 7. Formulario de comentario
 
-**Actor:** Usuario registrado.  
+**Actor:** Usuario.  
 **Objetivo:** Comentar una publicación.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
@@ -121,7 +121,7 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 ## 8. Formulario de solicitud de registro de videojuego
 
-**Actor:** Jugador registrado.  
+**Actor:** Jugador.  
 **Objetivo:** Solicitar el registro de un videojuego nuevo.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
@@ -152,14 +152,14 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 ## 10. Formulario de creación y edición de grupo
 
-**Actor:** Usuario registrado / administrador del grupo.  
+**Actor:** Usuario / Administrador del grupo.  
 **Objetivo:** Crear o actualizar un grupo relacionado con uno o varios videojuegos.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
 | Nombre del grupo | `VARCHAR` | Sí | Debe ser único o cumplir la regla definida por el equipo. |
 | Descripción | `TEXT` | Sí | Debe describir la finalidad del grupo. |
-| Videojuegos relacionados | `UUID[]` / relación | Sí | Deben seleccionarse entre 1 y 5 videojuegos aprobados, tanto para grupos públicos como privados. |
+| Videojuegos relacionados | `UUID[]` / relación | Sí | Deben seleccionarse entre 1 y 5 videojuegos aprobados para el grupo. |
 | Tipo de grupo | `ENUM('PUBLICO', 'PRIVADO')` | Sí | Opciones: **Público** o **Privado**. |
 | Imagen del grupo | `FILE/URL` | No | Formatos y tamaño máximo: **Por definir**. |
 | Reglas del grupo | `TEXT` | No | Recomendado para grupos públicos y privados. |
@@ -177,7 +177,7 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 ## 11. Formulario de solicitud de ingreso a grupo privado
 
-**Actor:** Usuario registrado.  
+**Actor:** Usuario.  
 **Objetivo:** Solicitar pertenecer a un grupo privado.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
@@ -201,20 +201,50 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 **Resultado esperado:** El usuario obtiene o no acceso al grupo privado según la decisión.
 
-## 13. Formulario de mensaje privado
+## 13. Formulario de reporte
 
-**Actor:** Usuario registrado.  
+**Actor:** Usuario.  
+**Objetivo:** Reportar contenido o un perfil para que sea revisado por el administrador de la plataforma.
+
+| Campo | Tipo | Obligatorio | Validaciones / observaciones |
+|---|---|---:|---|
+| Tipo de contenido | `ENUM` | Sí | Opciones: publicación, comentario, perfil o grupo. |
+| Contenido reportado | `UUID` | Sí | Identificador del contenido o perfil que se reporta. |
+| Motivo | `ENUM` | Sí | Catálogo de motivos: **Por definir**. |
+| Descripción | `TEXT` | Sí | Explicación del motivo del reporte. |
+| Evidencia | `FILE/URL` | No | Evidencia opcional; formato y tamaño máximo: **Por definir**. |
+
+**Acciones:** Enviar reporte, cancelar.  
+**Resultado esperado:** El reporte queda registrado con estado **Pendiente**.
+
+## 14. Formulario de revisión de reporte
+
+**Actor:** Administrador de la plataforma.  
+**Objetivo:** Revisar y actualizar el estado de un reporte sin aplicar sanciones.
+
+| Campo | Tipo | Obligatorio | Validaciones / observaciones |
+|---|---|---:|---|
+| Reporte | `UUID` | Sí | Identificador del reporte y datos asociados en solo lectura. |
+| Estado | `ENUM` | Sí | Opciones: pendiente, en revisión o cerrado. |
+| Comentario de revisión | `TEXT` | No | Observaciones del administrador. |
+
+**Acciones:** Guardar revisión, cancelar.  
+**Resultado esperado:** Se actualiza el estado del reporte y se registra la fecha de revisión.
+
+## 15. Formulario de mensaje privado
+
+**Actor:** Usuario.  
 **Objetivo:** Enviar un mensaje privado a otro usuario.
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Destinatario | `UUID` | Sí | Identificador de otro usuario registrado. |
+| Destinatario | `UUID` | Sí | Identificador de otro usuario. |
 | Mensaje | `TEXT` | Sí | Longitud máxima: **Por definir**. |
 
 **Acciones:** Enviar, cancelar.  
 **Resultado esperado:** El mensaje se guarda con remitente, destinatario y fecha de envío.
 
-## 14. Consideraciones generales de los formularios
+## 16. Consideraciones generales de los formularios
 
 - El sistema deberá indicar qué campos son obligatorios.
 - El sistema deberá mostrar mensajes claros cuando un dato sea inválido.
