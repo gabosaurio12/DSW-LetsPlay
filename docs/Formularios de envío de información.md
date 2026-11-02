@@ -3,7 +3,7 @@
 > Documento inicial para definir los formularios de la plataforma.  
 > Los campos marcados como **Por definir** pueden ser completados por el equipo.
 
-> **Tipos propuestos:** Se usa `UUID` para identificar registros relacionados, `VARCHAR(n)` para textos cortos, `TEXT` para textos largos, `DATE` para fechas, `ENUM` para opciones controladas y `FILE/URL` para imágenes. Si la base de datos utilizará identificadores enteros, `UUID` puede sustituirse por `INT`.
+> **Tipos propuestos:** Se usa `UUID` para identificar registros relacionados, `VARCHAR` para textos cortos, `TEXT` para textos largos, `DATE` para fechas, `ENUM` para opciones controladas y `FILE/URL` para imágenes. Si la base de datos utilizará identificadores enteros, `UUID` puede sustituirse por `INT`.
 
 ## 1. Formulario de registro de usuario
 
@@ -12,12 +12,12 @@
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Nombre de usuario | `VARCHAR(12)` | Sí | Debe ser único y contener únicamente letras y números. |
-| Correo electrónico | `VARCHAR(254)` | Sí | Debe tener formato válido y ser único. |
+| Nombre de usuario | `VARCHAR` | Sí | Debe ser único, tener máximo 12 caracteres y contener únicamente letras y números. |
+| Correo electrónico | `VARCHAR` | Sí | Debe tener formato válido y ser único. |
 | Fecha de nacimiento | `DATE` | Sí | Debe tener un formato de fecha válido. Restricción de edad mínima: **Por definir**. |
 | Género | `ENUM` | Sí | Opciones disponibles: **Por definir**. |
-| Contraseña | `VARCHAR(255)` | Sí | Debe almacenarse como hash; reglas de seguridad: **Por definir**. |
-| Confirmar contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe coincidir con la contraseña. |
+| Contraseña | `VARCHAR` | Sí | Debe almacenarse como hash; reglas de seguridad: **Por definir**. |
+| Confirmar contraseña | `VARCHAR` | Sí | Campo temporal; debe coincidir con la contraseña. |
 
 **Acciones:** Registrarse, cancelar.  
 **Resultado esperado:** Se crea la cuenta o se muestran los errores de validación.
@@ -29,8 +29,8 @@
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Correo o nombre de usuario | `VARCHAR(254)` | Sí | Debe corresponder a una cuenta registrada. |
-| Contraseña | `VARCHAR(255)` | Sí | Debe coincidir con la contraseña almacenada. |
+| Correo o nombre de usuario | `VARCHAR` | Sí | Debe corresponder a una cuenta registrada. |
+| Contraseña | `VARCHAR` | Sí | Debe coincidir con la contraseña almacenada. |
 
 **Acciones:** Iniciar sesión, recuperar contraseña.  
 **Resultado esperado:** Se inicia la sesión o se informa que las credenciales no son válidas.
@@ -42,7 +42,7 @@
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Nombre visible | `VARCHAR(100)` | **Por definir** | Longitud máxima: **Por definir**. |
+| Nombre visible | `VARCHAR` | **Por definir** | Longitud máxima: **Por definir**. |
 | Descripción personal | `TEXT` | No | Puede contener información pública del usuario. |
 | Biblioteca personal de videojuegos | `UUID[]` / relación | Sí | El usuario deberá relacionar entre 1 y 5 videojuegos aprobados con su perfil. Estos representan sus videojuegos favoritos o de interés. |
 | Fotografía de perfil | `FILE/URL` | No | Formatos y tamaño máximo: **Por definir**. |
@@ -65,9 +65,9 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Contraseña actual | `VARCHAR(255)` | Sí | Campo temporal; debe coincidir con la contraseña vigente. |
-| Nueva contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe cumplir las reglas de seguridad definidas. |
-| Confirmar nueva contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe coincidir con la nueva contraseña. |
+| Contraseña actual | `VARCHAR` | Sí | Campo temporal; debe coincidir con la contraseña vigente. |
+| Nueva contraseña | `VARCHAR` | Sí | Campo temporal; debe cumplir las reglas de seguridad definidas. |
+| Confirmar nueva contraseña | `VARCHAR` | Sí | Campo temporal; debe coincidir con la nueva contraseña. |
 
 **Acciones:** Cambiar contraseña, cancelar.  
 **Resultado esperado:** Se actualiza la contraseña si la identidad y los datos son válidos.
@@ -79,10 +79,10 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Correo electrónico | `VARCHAR(254)` | Sí | Debe estar asociado a una cuenta. |
-| Código o enlace de recuperación | `VARCHAR(255)` | Sí | Código temporal o token; mecanismo de recuperación: **Por definir**. |
-| Nueva contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe cumplir las reglas de seguridad definidas. |
-| Confirmar nueva contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe coincidir con la nueva contraseña. |
+| Correo electrónico | `VARCHAR` | Sí | Debe estar asociado a una cuenta. |
+| Código o enlace de recuperación | `VARCHAR` | Sí | Código temporal o token; mecanismo de recuperación: **Por definir**. |
+| Nueva contraseña | `VARCHAR` | Sí | Campo temporal; debe cumplir las reglas de seguridad definidas. |
+| Confirmar nueva contraseña | `VARCHAR` | Sí | Campo temporal; debe coincidir con la nueva contraseña. |
 
 ## 6. Formulario de publicación
 
@@ -126,10 +126,10 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Nombre del videojuego | `VARCHAR(150)` | Sí | Debe ser válido y no estar duplicado, según las reglas del sistema. |
+| Nombre del videojuego | `VARCHAR` | Sí | Debe ser válido y no estar duplicado, según las reglas del sistema. |
 | Descripción | `TEXT` | Sí | Información general del videojuego. |
-| Género | `ENUM` / `VARCHAR(50)` | **Por definir** | Catálogo de géneros: **Por definir**. |
-| Plataforma | `ENUM` / `VARCHAR(50)` | **Por definir** | Plataformas soportadas: **Por definir**. |
+| Género | `ENUM` / `VARCHAR` | **Por definir** | Catálogo de géneros: **Por definir**. |
+| Plataforma | `ENUM` / `VARCHAR` | **Por definir** | Plataformas soportadas: **Por definir**. |
 | Imagen o portada | `FILE/URL` | No | Formatos y tamaño máximo: **Por definir**. |
 | Información adicional | `TEXT` | No | Campo opcional. |
 
@@ -157,7 +157,7 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Nombre del grupo | `VARCHAR(150)` | Sí | Debe ser único o cumplir la regla definida por el equipo. |
+| Nombre del grupo | `VARCHAR` | Sí | Debe ser único o cumplir la regla definida por el equipo. |
 | Descripción | `TEXT` | Sí | Debe describir la finalidad del grupo. |
 | Videojuegos relacionados | `UUID[]` / relación | Sí | Deben seleccionarse entre 1 y 5 videojuegos aprobados, tanto para grupos públicos como privados. |
 | Tipo de grupo | `ENUM('PUBLICO', 'PRIVADO')` | Sí | Opciones: **Público** o **Privado**. |
