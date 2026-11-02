@@ -37,6 +37,8 @@
 | RF-12 | El sistema deberá guardar los cambios realizados en el perfil y mostrarlos posteriormente. | Alta |
 | RF-60 | El sistema deberá permitir que un usuario elimine su propia cuenta desde su perfil. | Alta |
 | RF-64 | El sistema deberá solicitar confirmación antes de eliminar una cuenta de usuario. | Alta |
+| RF-88 | El sistema deberá permitir que un usuario relacione entre 1 y 5 videojuegos aprobados con su perfil para conformar su biblioteca personal. | Alta |
+| RF-89 | El sistema deberá permitir que un usuario agregue, elimine o cambie los videojuegos relacionados con su perfil, manteniendo entre 1 y 5 videojuegos asociados. | Alta |
 
 ## 4. Requisitos de publicaciones
 
@@ -113,6 +115,10 @@
 | RF-55 | El sistema deberá restringir las publicaciones de un grupo privado a sus integrantes autorizados. | Alta |
 | RF-56 | El sistema deberá impedir que un usuario sin permisos administre un grupo o acceda al contenido privado de un grupo. | Alta |
 | RF-57 | El sistema deberá permitir que el administrador del grupo actualice la información y configuración del grupo, sin administrar la página del videojuego relacionado. | Alta |
+| RF-84 | El sistema deberá exigir que todo grupo, público o privado, se relacione inicialmente con un mínimo de 1 y un máximo de 5 videojuegos aprobados. | Alta |
+| RF-85 | El sistema deberá permitir que el administrador de cualquier grupo agregue, elimine o edite los videojuegos relacionados, manteniendo siempre entre 1 y 5 videojuegos asociados. | Alta |
+| RF-86 | El sistema deberá permitir que una publicación dentro de cualquier grupo no tenga un videojuego específico seleccionado. | Alta |
+| RF-87 | Si una publicación dentro de un grupo especifica un videojuego, el sistema deberá validar que pertenezca a los videojuegos relacionados con ese grupo. | Alta |
 
 ## 9. Mensajería privada
 
