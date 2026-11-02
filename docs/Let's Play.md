@@ -80,8 +80,29 @@ Se describen los recursos humanos y técnicos disponibles para el desarrollo de 
 - ChatGPT
 - Calude
 - Gemini Flash
-- Antigravity
 
 La selección y uso de las tecnologías y herramientas mencionadas estará sujeta a las necesidades del proyecto y a las decisiones acordadas por el equipo de desarrollo. 
 
 ## Riesgos y restricciones (Leo)
+
+Se identifican los riesgos que podrían afectar el cumplimiento de los objetivos y las restricciones bajo las cuales debe ejecutarse el proyecto *Let's Play*.
+
+### Riesgos del proyecto
+
+| ID | Riesgo identificado | Probabilidad | Impacto | Estrategia de mitigación |
+|---|---|:---:|:---:|---|
+| **R-01** | **Desviación del alcance por funcionalidades complejas:** Intentar implementar características avanzadas (recomendaciones por IA, transmisiones en vivo o aplicaciones móviles nativas) en lugar de las funciones prioritarias. | Media | Alto | Apego estricto a las prioridades del proyecto (Prioridades 1 a 6) y postergar características secundarias al backlog de versiones futuras. |
+| **R-02** | **Disponibilidad de tiempo y carga académica simultánea:** Retrasos en los entregables debido a la carga de materias del séptimo semestre de los integrantes. | Alta | Alto | Planificación semanal basada en sprints cortos, seguimiento continuo mediante el tablero Trello y redistribución de tareas ante contingencias. |
+| **R-03** | **Curva de integración tecnológica (Next.js / Node.js / Base de datos):** Dificultades técnicas en la estructuración de componentes cliente-servidor o en la persistencia relacional. | Media | Medio | Construcción temprana del prototipo arquitectónico base (Fase 3.1) y soporte colaborativo con herramientas de IA y documentación técnica oficial. |
+| **R-04** | **Inconsistencia en la integridad de datos:** Errores al manejar relaciones complejas (límites estrictos de 1 a 5 videojuegos por perfil/grupo y aislamiento de grupos privados). | Media | Alto | Doble validación obligatoria: en frontend mediante validadores de formulario y en backend mediante transacciones y restricciones de integridad en base de datos. |
+| **R-05** | **Conflictos en el control de versiones (Git):** Pérdida de código o colisiones durante la integración de ramas de trabajo de los tres desarrolladores. | Media | Medio | Definición de una política de ramas (rama `main` protegida, ramas por funcionalidad) y revisión de cambios antes de realizar *merges*. |
+| **R-06** | **Riesgos de seguridad en autenticación y almacenamiento:** Vulnerabilidades por almacenamiento inseguro de contraseñas o subida descontrolada de archivos de imagen. | Baja | Alto | Implementación de funciones hash seguras (bcrypt/argon2), sanitización estricta de entradas y validación de tipos MIME y tamaño máximo en imágenes. |
+
+### Restricciones del proyecto
+
+1. **Restricción temporal:** El proyecto debe ser completado en un periodo improrrogable de **dos meses (8 semanas)**, ajustado al calendario y fechas de entrega del periodo escolar.
+2. **Restricción de equipo humano:** El equipo de desarrollo está conformado exclusivamente por **tres estudiantes** de Ingeniería de Software, quienes asumen la totalidad de los roles de análisis, diseño, frontend, backend, pruebas y documentación.
+3. **Restricción de plataforma y entorno:** La aplicación está acotada a una **interfaz web accesible desde computadoras de escritorio**; no incluye desarrollo de aplicaciones nativas para dispositivos móviles (Android/iOS) en esta versión.
+4. **Restricción económica y de infraestructura:** El proyecto no dispone de presupuesto financiero asignado; su ejecución, pruebas y almacenamiento se realizarán en entornos locales y servicios con niveles de uso gratuitos (*free tiers*).
+5. **Restricciones tecnológicas acordadas:** El stack técnico principal se limita al ecosistema definido por el equipo: Node.js, Next.js y React, con una base de datos relacional y modelado arquitectónico basado en el estándar WAE.
+6. **Restricción institucional y académica:** Toda la documentación, especificación de casos de uso y entregables deben sujetarse a los lineamientos y rúbricas establecidos para la plataforma educativa institucional Eminus.
