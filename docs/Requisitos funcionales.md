@@ -1,0 +1,145 @@
+# Requisitos funcionales — Let's Play
+
+> **Borrador inicial:** requisitos detectados a partir de los documentos de alcance del proyecto.  
+> El equipo puede eliminar, combinar o ajustar los requisitos según las decisiones finales del proyecto.
+
+## 1. Actores
+
+- **Usuario registrado:** persona con una cuenta activa en la plataforma.
+- **Jugador:** usuario registrado que utiliza la plataforma y puede solicitar el registro de un videojuego.
+- **Administrador del grupo:** usuario que creó un grupo o que tenga permisos de administración dentro de él.
+- **Administrador de la plataforma:** usuario responsable de revisar y resolver las solicitudes de registro de nuevos videojuegos.
+- **Sistema:** aplicación web responsable de validar, procesar y almacenar la información.
+
+## 2. Requisitos de autenticación y cuentas
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-01 | El sistema deberá permitir que una persona cree una cuenta de usuario. | Alta |
+| RF-02 | El sistema deberá solicitar y validar los datos necesarios para registrar una cuenta. | Alta |
+| RF-03 | El sistema deberá impedir el registro de una cuenta con datos obligatorios inválidos o ya utilizados, cuando corresponda. | Alta |
+| RF-04 | El sistema deberá permitir que un usuario registrado inicie sesión con sus credenciales. | Alta |
+| RF-05 | El sistema deberá validar las credenciales antes de conceder acceso a las funciones privadas. | Alta |
+| RF-06 | El sistema deberá permitir que un usuario cierre su sesión. | Media |
+| RF-07 | El sistema deberá restringir las funciones que requieren autenticación a usuarios con una sesión válida. | Alta |
+| RF-61 | El sistema deberá permitir que un usuario cambie su contraseña después de iniciar sesión. | Alta |
+| RF-62 | El sistema deberá permitir que un usuario solicite la recuperación de su contraseña cuando no pueda acceder a su cuenta. | Alta |
+| RF-63 | El sistema deberá validar la identidad del usuario antes de permitir el cambio o recuperación de la contraseña. | Alta |
+
+## 3. Requisitos de perfil
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-08 | El sistema deberá permitir que un usuario consulte su perfil. | Alta |
+| RF-09 | El sistema deberá permitir que un usuario consulte la información pública del perfil de otro usuario. | Media |
+| RF-10 | El sistema deberá permitir que un usuario edite la información personal definida para su perfil. | Alta |
+| RF-11 | El sistema deberá permitir que un usuario agregue, cambie o elimine su fotografía de perfil. | Media |
+| RF-12 | El sistema deberá guardar los cambios realizados en el perfil y mostrarlos posteriormente. | Alta |
+| RF-60 | El sistema deberá permitir que un usuario elimine su propia cuenta desde su perfil. | Alta |
+| RF-64 | El sistema deberá solicitar confirmación antes de eliminar una cuenta de usuario. | Alta |
+
+## 4. Requisitos de publicaciones
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-13 | El sistema deberá permitir que un usuario registrado cree una publicación relacionada con videojuegos. | Alta |
+| RF-14 | El sistema deberá permitir que una publicación contenga texto. | Alta |
+| RF-15 | El sistema deberá permitir que una publicación contenga una imagen. | Alta |
+| RF-16 | El sistema deberá validar que la información obligatoria de una publicación esté completa antes de guardarla. | Alta |
+| RF-17 | El sistema deberá asociar cada publicación con el usuario que la creó y registrar su fecha de creación. | Alta |
+| RF-18 | El sistema deberá permitir visualizar el contenido de una publicación junto con su autor. | Alta |
+| RF-19 | El sistema deberá conservar las publicaciones almacenadas para que sigan disponibles después de cerrar la sesión. | Alta |
+| RF-65 | El sistema deberá permitir que un usuario elimine sus propias publicaciones. | Alta |
+| RF-66 | El sistema deberá impedir que un usuario elimine publicaciones creadas por otro usuario. | Alta |
+
+## 5. Feed principal y visualización de contenido
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-20 | El sistema deberá mostrar a los usuarios autenticados un feed principal con las publicaciones disponibles. | Alta |
+| RF-21 | El sistema deberá mostrar en el feed la información básica de cada publicación, incluyendo autor, contenido, fecha e interacciones disponibles. | Alta |
+| RF-22 | El sistema deberá permitir que el usuario consulte las publicaciones del feed de forma ordenada y legible. | Alta |
+
+## 6. Registro y aprobación de videojuegos
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-23 | El sistema deberá permitir que un jugador registrado solicite el registro de un nuevo videojuego en la plataforma. | Alta |
+| RF-24 | El sistema deberá solicitar y validar los datos obligatorios del videojuego antes de enviar la solicitud. | Alta |
+| RF-25 | El sistema deberá registrar cada solicitud de videojuego con el jugador que la creó, su fecha de envío y el estado de la solicitud. | Alta |
+| RF-26 | El sistema deberá permitir que el administrador de la plataforma consulte las solicitudes pendientes de registro de videojuegos. | Alta |
+| RF-27 | El sistema deberá permitir que el administrador de la plataforma acepte una solicitud de registro de videojuego. | Alta |
+| RF-28 | El sistema deberá permitir que el administrador de la plataforma rechace una solicitud de registro de videojuego. | Alta |
+| RF-29 | El sistema deberá actualizar el estado de la solicitud según la decisión tomada por el administrador. | Alta |
+| RF-30 | El sistema deberá registrar la decisión del administrador y la fecha en que fue tomada. | Media |
+| RF-31 | El sistema deberá informar al jugador el resultado de su solicitud, cuando esta haya sido aceptada o rechazada. | Media |
+| RF-32 | El sistema deberá crear o habilitar la página del videojuego en la plataforma únicamente cuando la solicitud haya sido aceptada. | Alta |
+| RF-67 | El sistema deberá permitir que el administrador de la plataforma administre la información de las páginas de videojuegos aceptados. | Alta |
+| RF-68 | El sistema deberá permitir que el administrador de la plataforma actualice la información publicada en una página de videojuego. | Alta |
+| RF-69 | El sistema deberá permitir que el administrador de la plataforma deshabilite o retire una página de videojuego conforme a las reglas definidas por el proyecto. | Media |
+| RF-70 | El sistema deberá impedir que los usuarios registrados administren directamente las páginas de videojuegos. | Alta |
+
+## 7. Requisitos de interacción social
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-33 | El sistema deberá permitir que un usuario registrado indique que le gusta una publicación. | Alta |
+| RF-34 | El sistema deberá permitir que un usuario retire su reacción de me gusta de una publicación. | Media |
+| RF-35 | El sistema deberá mostrar el estado y/o cantidad de reacciones de una publicación. | Media |
+| RF-36 | El sistema deberá permitir que un usuario registrado agregue un comentario a una publicación. | Alta |
+| RF-37 | El sistema deberá mostrar los comentarios asociados a una publicación. | Alta |
+| RF-38 | El sistema deberá asociar cada comentario con el usuario que lo realizó y registrar su fecha de creación. | Alta |
+| RF-39 | El sistema deberá permitir compartir una publicación, si esta funcionalidad se mantiene en el alcance final. | Media |
+| RF-40 | Si se implementa la opción de compartir, el sistema deberá registrar al usuario que realizó la acción y mostrar la publicación compartida según la regla definida por el equipo. | Media |
+
+## 8. Requisitos de grupos y comunidades
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-41 | El sistema deberá permitir que un usuario registrado cree un grupo relacionado con uno o varios videojuegos disponibles en la plataforma. | Alta |
+| RF-42 | El sistema deberá permitir que el creador defina si el grupo será público o privado. | Alta |
+| RF-43 | El sistema deberá solicitar y validar los datos obligatorios del grupo antes de crearlo. | Alta |
+| RF-44 | El sistema deberá asociar cada grupo con el usuario que lo creó. | Alta |
+| RF-45 | El sistema deberá mantener la relación entre cada grupo y uno o varios videojuegos. | Alta |
+| RF-46 | El sistema deberá permitir que un usuario consulte los grupos públicos disponibles. | Media |
+| RF-47 | El sistema deberá permitir que un usuario se una directamente a un grupo público. | Alta |
+| RF-48 | El sistema deberá permitir que un usuario solicite unirse a un grupo privado, de acuerdo con las reglas definidas por el administrador del grupo. | Alta |
+| RF-49 | El sistema deberá permitir que un usuario abandone un grupo al que pertenece. | Alta |
+| RF-50 | El sistema deberá permitir que el administrador del grupo gestione las solicitudes de ingreso a un grupo privado. | Media |
+| RF-51 | El sistema deberá permitir que el administrador del grupo elimine a un integrante. | Media |
+| RF-52 | El sistema deberá permitir que el administrador del grupo elimine el grupo, de acuerdo con las reglas definidas por el proyecto. | Alta |
+| RF-53 | El sistema deberá permitir la creación y visualización de publicaciones dentro de un grupo. | Alta |
+| RF-54 | El sistema deberá mostrar las publicaciones de un grupo público a sus usuarios autorizados según las reglas del grupo. | Alta |
+| RF-55 | El sistema deberá restringir las publicaciones de un grupo privado a sus integrantes autorizados. | Alta |
+| RF-56 | El sistema deberá impedir que un usuario sin permisos administre un grupo o acceda al contenido privado de un grupo. | Alta |
+| RF-57 | El sistema deberá permitir que el administrador del grupo actualice la información y configuración del grupo, sin administrar la página del videojuego relacionado. | Alta |
+
+## 9. Mensajería privada
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-76 | El sistema deberá permitir que un usuario registrado envíe mensajes privados a otro usuario, si esta funcionalidad se mantiene en el alcance final. | Media |
+| RF-77 | El sistema deberá permitir que los usuarios autorizados consulten sus conversaciones y mensajes privados. | Media |
+| RF-78 | El sistema deberá asociar cada mensaje con su remitente, destinatario y fecha de envío. | Media |
+
+## 10. Persistencia y consistencia de la información
+
+| ID | Requisito | Prioridad |
+|---|---|---|
+| RF-79 | El sistema deberá almacenar de forma persistente las cuentas y datos de los usuarios. | Alta |
+| RF-80 | El sistema deberá almacenar los perfiles, publicaciones, imágenes, grupos, comentarios, reacciones, solicitudes de videojuegos y páginas de videojuegos. | Alta |
+| RF-81 | El sistema deberá mantener las relaciones entre usuarios, publicaciones, comentarios, reacciones, grupos, mensajes y videojuegos. | Alta |
+| RF-82 | El sistema deberá reflejar en la aplicación los cambios confirmados en la base de datos. | Alta |
+| RF-83 | El sistema deberá informar al usuario cuando una operación no pueda completarse y no deberá guardar información incompleta o inconsistente. | Alta |
+
+## 11. Decisiones pendientes del alcance
+
+Los siguientes puntos aparecen en los documentos, pero requieren confirmación antes de convertirlos en requisitos definitivos:
+
+1. **Compartir publicaciones:** aparece en el alcance, pero no en las prioridades ni en todos los criterios de finalización.
+2. **Mensajes privados:** aparece en los criterios de finalización, pero no en la lista principal de funcionalidades ni en los entregables.
+3. **Grupos:** ya se definió que podrán ser públicos o privados; queda pendiente decidir si los grupos privados requieren aprobación obligatoria o si el administrador puede aceptar automáticamente las solicitudes.
+4. **Edición y eliminación de publicaciones, comentarios o imágenes:** no están descritas explícitamente en el alcance actual.
+5. **Verificación de correo:** no está descrita explícitamente y debe confirmarse antes de incluirla.
+6. **Tipos de usuario:** jugadores, desarrolladores y creadores de contenido están identificados como usuarios objetivo, pero el alcance indica que no habrá funcionalidades diferenciadas; por ello, en este borrador se consideran un mismo tipo de usuario registrado.
+
