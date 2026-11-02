@@ -3,6 +3,8 @@
 > Documento inicial para definir los formularios de la plataforma.  
 > Los campos marcados como **Por definir** pueden ser completados por el equipo.
 
+> **Tipos propuestos:** Se usa `UUID` para identificar registros relacionados, `VARCHAR(n)` para textos cortos, `TEXT` para textos largos, `DATE` para fechas, `ENUM` para opciones controladas y `FILE/URL` para imágenes. Si la base de datos utilizará identificadores enteros, `UUID` puede sustituirse por `INT`.
+
 ## 1. Formulario de registro de usuario
 
 **Actor:** Persona que desea crear una cuenta.  
@@ -10,12 +12,12 @@
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Nombre de usuario | Texto alfanumérico | Sí | Debe ser único, tener máximo 12 caracteres y contener únicamente letras y números. |
-| Correo electrónico | Correo | Sí | Debe tener formato válido y ser único. |
-| Fecha de nacimiento | Fecha | Sí | Debe tener un formato de fecha válido. Restricción de edad mínima: **Por definir**. |
-| Género | Selección | Sí | Opciones disponibles: **Por definir**. |
-| Contraseña | Contraseña | Sí | Reglas de seguridad: **Por definir**. |
-| Confirmar contraseña | Contraseña | Sí | Debe coincidir con la contraseña. |
+| Nombre de usuario | `VARCHAR(12)` | Sí | Debe ser único y contener únicamente letras y números. |
+| Correo electrónico | `VARCHAR(254)` | Sí | Debe tener formato válido y ser único. |
+| Fecha de nacimiento | `DATE` | Sí | Debe tener un formato de fecha válido. Restricción de edad mínima: **Por definir**. |
+| Género | `ENUM` | Sí | Opciones disponibles: **Por definir**. |
+| Contraseña | `VARCHAR(255)` | Sí | Debe almacenarse como hash; reglas de seguridad: **Por definir**. |
+| Confirmar contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe coincidir con la contraseña. |
 
 **Acciones:** Registrarse, cancelar.  
 **Resultado esperado:** Se crea la cuenta o se muestran los errores de validación.
@@ -27,8 +29,8 @@
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Correo o nombre de usuario | Texto | Sí | Debe corresponder a una cuenta registrada. |
-| Contraseña | Contraseña | Sí | Debe coincidir con la contraseña almacenada. |
+| Correo o nombre de usuario | `VARCHAR(254)` | Sí | Debe corresponder a una cuenta registrada. |
+| Contraseña | `VARCHAR(255)` | Sí | Debe coincidir con la contraseña almacenada. |
 
 **Acciones:** Iniciar sesión, recuperar contraseña.  
 **Resultado esperado:** Se inicia la sesión o se informa que las credenciales no son válidas.
@@ -40,10 +42,10 @@
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Nombre visible | Texto | **Por definir** | Longitud máxima: **Por definir**. |
-| Descripción personal | Texto largo | No | Puede contener información pública del usuario. |
-| Biblioteca personal de videojuegos | Selección múltiple | Sí | El usuario deberá relacionar entre 1 y 5 videojuegos aprobados con su perfil. Estos representan sus videojuegos favoritos o de interés. |
-| Fotografía de perfil | Imagen | No | Formatos y tamaño máximo: **Por definir**. |
+| Nombre visible | `VARCHAR(100)` | **Por definir** | Longitud máxima: **Por definir**. |
+| Descripción personal | `TEXT` | No | Puede contener información pública del usuario. |
+| Biblioteca personal de videojuegos | `UUID[]` / relación | Sí | El usuario deberá relacionar entre 1 y 5 videojuegos aprobados con su perfil. Estos representan sus videojuegos favoritos o de interés. |
+| Fotografía de perfil | `FILE/URL` | No | Formatos y tamaño máximo: **Por definir**. |
 
 **Acciones:** Guardar cambios, eliminar fotografía, eliminar cuenta.  
 **Resultado esperado:** Se actualiza el perfil o se informa el error correspondiente.
@@ -63,9 +65,9 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Contraseña actual | Contraseña | Sí | Debe coincidir con la contraseña vigente. |
-| Nueva contraseña | Contraseña | Sí | Debe cumplir las reglas de seguridad definidas. |
-| Confirmar nueva contraseña | Contraseña | Sí | Debe coincidir con la nueva contraseña. |
+| Contraseña actual | `VARCHAR(255)` | Sí | Campo temporal; debe coincidir con la contraseña vigente. |
+| Nueva contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe cumplir las reglas de seguridad definidas. |
+| Confirmar nueva contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe coincidir con la nueva contraseña. |
 
 **Acciones:** Cambiar contraseña, cancelar.  
 **Resultado esperado:** Se actualiza la contraseña si la identidad y los datos son válidos.
@@ -77,10 +79,10 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Correo electrónico | Correo | Sí | Debe estar asociado a una cuenta. |
-| Código o enlace de recuperación | Texto / enlace | Sí | Mecanismo de recuperación: **Por definir**. |
-| Nueva contraseña | Contraseña | Sí | Debe cumplir las reglas de seguridad definidas. |
-| Confirmar nueva contraseña | Contraseña | Sí | Debe coincidir con la nueva contraseña. |
+| Correo electrónico | `VARCHAR(254)` | Sí | Debe estar asociado a una cuenta. |
+| Código o enlace de recuperación | `VARCHAR(255)` | Sí | Código temporal o token; mecanismo de recuperación: **Por definir**. |
+| Nueva contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe cumplir las reglas de seguridad definidas. |
+| Confirmar nueva contraseña | `VARCHAR(255)` | Sí | Campo temporal; debe coincidir con la nueva contraseña. |
 
 ## 6. Formulario de publicación
 
@@ -89,10 +91,10 @@ Antes de eliminar la cuenta, el sistema deberá mostrar una confirmación explí
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Videojuego relacionado | Selección | Condicional | En publicaciones generales es obligatorio. En publicaciones dentro de cualquier grupo puede omitirse; si se selecciona, debe pertenecer a los videojuegos relacionados con el grupo. |
-| Texto | Texto largo | **Por definir** | Debe respetar la longitud máxima definida. |
-| Imagen | Imagen | No | Formatos y tamaño máximo: **Por definir**. |
-| Visibilidad / grupo | Selección | No | Aplicable si la publicación pertenece a un grupo. |
+| Videojuego relacionado | `UUID` nullable | Condicional | En publicaciones generales es obligatorio. En publicaciones dentro de cualquier grupo puede omitirse; si se selecciona, debe pertenecer a los videojuegos relacionados con el grupo. |
+| Texto | `TEXT` | **Por definir** | Debe respetar la longitud máxima definida. |
+| Imagen | `FILE/URL` | No | Formatos y tamaño máximo: **Por definir**. |
+| Visibilidad / grupo | `UUID` nullable | No | Identificador del grupo; aplicable si la publicación pertenece a un grupo. |
 
 **Acciones:** Publicar, cancelar.  
 **Resultado esperado:** Se crea la publicación asociada al usuario, la fecha de envío y, cuando corresponda, al grupo y al videojuego seleccionado.
@@ -112,7 +114,7 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Texto del comentario | Texto largo | Sí | Longitud máxima: **Por definir**. |
+| Texto del comentario | `TEXT` | Sí | Longitud máxima: **Por definir**. |
 
 **Acciones:** Comentar, cancelar.  
 **Resultado esperado:** El comentario queda asociado al usuario, la publicación y la fecha de creación.
@@ -124,12 +126,12 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Nombre del videojuego | Texto | Sí | Debe ser válido y no estar duplicado, según las reglas del sistema. |
-| Descripción | Texto largo | Sí | Información general del videojuego. |
-| Género | Selección / texto | **Por definir** | Catálogo de géneros: **Por definir**. |
-| Plataforma | Selección / texto | **Por definir** | Plataformas soportadas: **Por definir**. |
-| Imagen o portada | Imagen | No | Formatos y tamaño máximo: **Por definir**. |
-| Información adicional | Texto largo | No | Campo opcional. |
+| Nombre del videojuego | `VARCHAR(150)` | Sí | Debe ser válido y no estar duplicado, según las reglas del sistema. |
+| Descripción | `TEXT` | Sí | Información general del videojuego. |
+| Género | `ENUM` / `VARCHAR(50)` | **Por definir** | Catálogo de géneros: **Por definir**. |
+| Plataforma | `ENUM` / `VARCHAR(50)` | **Por definir** | Plataformas soportadas: **Por definir**. |
+| Imagen o portada | `FILE/URL` | No | Formatos y tamaño máximo: **Por definir**. |
+| Información adicional | `TEXT` | No | Campo opcional. |
 
 **Acciones:** Enviar solicitud, cancelar.  
 **Resultado esperado:** La solicitud queda registrada con estado **Pendiente**.
@@ -141,9 +143,9 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Solicitud | Solo lectura | Sí | Muestra los datos enviados por el jugador. |
-| Decisión | Selección | Sí | Opciones: **Aceptar** o **Rechazar**. |
-| Motivo de rechazo | Texto largo | Solo al rechazar | Recomendado para explicar la decisión. |
+| Solicitud | `UUID` | Sí | Identificador de la solicitud; sus datos se muestran en modo solo lectura. |
+| Decisión | `ENUM('ACEPTAR', 'RECHAZAR')` | Sí | Opciones: **Aceptar** o **Rechazar**. |
+| Motivo de rechazo | `TEXT` | Solo al rechazar | Recomendado para explicar la decisión. |
 
 **Acciones:** Aceptar, rechazar, cancelar.  
 **Resultado esperado:** La solicitud cambia de estado y, si se acepta, se habilita la página del videojuego.
@@ -155,12 +157,12 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Nombre del grupo | Texto | Sí | Debe ser único o cumplir la regla definida por el equipo. |
-| Descripción | Texto largo | Sí | Debe describir la finalidad del grupo. |
-| Videojuegos relacionados | Selección múltiple | Sí | Deben seleccionarse entre 1 y 5 videojuegos aprobados, tanto para grupos públicos como privados. |
-| Tipo de grupo | Selección | Sí | Opciones: **Público** o **Privado**. |
-| Imagen del grupo | Imagen | No | Formatos y tamaño máximo: **Por definir**. |
-| Reglas del grupo | Texto largo | No | Recomendado para grupos públicos y privados. |
+| Nombre del grupo | `VARCHAR(150)` | Sí | Debe ser único o cumplir la regla definida por el equipo. |
+| Descripción | `TEXT` | Sí | Debe describir la finalidad del grupo. |
+| Videojuegos relacionados | `UUID[]` / relación | Sí | Deben seleccionarse entre 1 y 5 videojuegos aprobados, tanto para grupos públicos como privados. |
+| Tipo de grupo | `ENUM('PUBLICO', 'PRIVADO')` | Sí | Opciones: **Público** o **Privado**. |
+| Imagen del grupo | `FILE/URL` | No | Formatos y tamaño máximo: **Por definir**. |
+| Reglas del grupo | `TEXT` | No | Recomendado para grupos públicos y privados. |
 
 **Acciones:** Crear grupo, guardar cambios, agregar videojuego relacionado, eliminar videojuego relacionado, cancelar, eliminar grupo.  
 **Resultado esperado:** Se crea o actualiza el grupo con su tipo y videojuegos relacionados.
@@ -180,8 +182,8 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Grupo seleccionado | Solo lectura | Sí | Debe corresponder a un grupo privado. |
-| Mensaje de solicitud | Texto largo | No | Uso: **Por definir**. |
+| Grupo seleccionado | `UUID` | Sí | Identificador del grupo privado; se muestra en modo solo lectura. |
+| Mensaje de solicitud | `TEXT` | No | Uso: **Por definir**. |
 
 **Acciones:** Enviar solicitud, cancelar.  
 **Resultado esperado:** La solicitud queda pendiente para revisión del administrador del grupo.
@@ -193,9 +195,9 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Solicitud de ingreso | Solo lectura | Sí | Muestra el usuario solicitante y el grupo. |
-| Decisión | Selección | Sí | Opciones: **Aceptar** o **Rechazar**. |
-| Comentario | Texto largo | No | Opcional. |
+| Solicitud de ingreso | `UUID` | Sí | Identificador de la solicitud; muestra el usuario solicitante y el grupo. |
+| Decisión | `ENUM('ACEPTAR', 'RECHAZAR')` | Sí | Opciones: **Aceptar** o **Rechazar**. |
+| Comentario | `TEXT` | No | Opcional. |
 
 **Resultado esperado:** El usuario obtiene o no acceso al grupo privado según la decisión.
 
@@ -206,8 +208,8 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 
 | Campo | Tipo | Obligatorio | Validaciones / observaciones |
 |---|---|---:|---|
-| Destinatario | Selección / búsqueda | Sí | Debe ser otro usuario registrado. |
-| Mensaje | Texto largo | Sí | Longitud máxima: **Por definir**. |
+| Destinatario | `UUID` | Sí | Identificador de otro usuario registrado. |
+| Mensaje | `TEXT` | Sí | Longitud máxima: **Por definir**. |
 
 **Acciones:** Enviar, cancelar.  
 **Resultado esperado:** El mensaje se guarda con remitente, destinatario y fecha de envío.
