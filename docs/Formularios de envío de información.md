@@ -244,7 +244,7 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 **Acciones:** Enviar, cancelar.  
 **Resultado esperado:** El mensaje se guarda con remitente, destinatario y fecha de envío.
 
-## 16. Consideraciones generales de los formularios
+## Consideraciones generales de los formularios
 
 - El sistema deberá indicar qué campos son obligatorios.
 - El sistema deberá mostrar mensajes claros cuando un dato sea inválido.
@@ -252,4 +252,371 @@ El usuario deberá confirmar antes de eliminar una publicación propia. El siste
 - Los formularios deberán mostrar una confirmación cuando la operación se complete correctamente.
 - Las acciones disponibles deberán depender del tipo de usuario y de sus permisos.
 - Las imágenes deberán validar formato, tamaño y dimensiones máximas, valores que quedan **por definir**.
+
+---
+
+## Usuario
+
+Representa las cuentas registradas en la plataforma y la información asociada con su perfil. Se propone mantener los datos de autenticación y perfil en una misma entidad inicialmente, ya que el formulario de registro y el de perfil están relacionados directamente.
+
+### Tabla: `User`
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_usuario | `UUID` | PK, NOT NULL | Identificador único del usuario. |
+| nombre_usuario | `VARCHAR(12)` | UNIQUE, NOT NULL | Nombre de usuario. Solo permite caracteres alfanuméricos. |
+| correo_electronico | `VARCHAR(255)` | UNIQUE, NOT NULL | Correo electrónico asociado con la cuenta. |
+| fecha_nacimiento | `DATE` | NOT NULL | Fecha de nacimiento del usuario. |
+| genero | `ENUM` | NOT NULL | Género seleccionado durante el registro. Las opciones quedan por definir. |
+| password_hash | `VARCHAR(255)` | NOT NULL | Contraseña almacenada mediante un algoritmo seguro de hash. |
+| nombre_visible | `VARCHAR(100)` | NULL | Nombre que se muestra públicamente en el perfil. |
+| descripcion | `TEXT` | NULL | Descripción personal del usuario. |
+| fotografia_perfil | `VARCHAR(500)` | NULL | URL o ruta de almacenamiento de la fotografía de perfil. |
+| fecha_registro | `TIMESTAMP` | NOT NULL | Fecha y hora en que se creó la cuenta. |
+| fecha_actualizacion | `TIMESTAMP` | NULL | Fecha de la última modificación del perfil. |
+| estado_cuenta | `ENUM` | NOT NULL | Estado de la cuenta, por ejemplo: activa o eliminada. |
+
+**Consideraciones:**
+- `id_usuario` será la clave primaria y se utilizará para relacionar al usuario con sus publicaciones, comentarios, grupos y demás elementos.
+- El nombre de usuario tendrá un máximo de 12 caracteres alfanuméricos.
+- La contraseña nunca deberá almacenarse en texto plano; únicamente se almacenará su hash.
+- La confirmación de contraseña no se almacenará, ya que es un campo temporal del formulario.
+- El nombre visible y la descripción personal podrán modificarse desde el perfil.
+- La fotografía deberá almacenarse como archivo externo; en la base de datos se conservará su URL o referencia.
+- Las opciones del campo `genero` y los estados de cuenta deberán definirse antes de implementar la base de datos.
+
+### Tabla: `UserVideogames`
+
+Representa la biblioteca personal de videojuegos de cada usuario. Se utiliza una tabla intermedia porque un usuario puede tener varios videojuegos y un videojuego puede estar relacionado con varios usuarios.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_usuario | `UUID` | PK, FK → Usuario | Usuario propietario de la biblioteca. |
+| id_videojuego | `UUID` | PK, FK → Videojuego | Videojuego relacionado con el perfil. |
+| fecha_agregado | `TIMESTAMP` | NOT NULL | Fecha en que se agregó el videojuego a la biblioteca. |
+
+**Consideraciones:**
+- La combinación de `id_usuario` e `id_videojuego` será la clave primaria compuesta.
+- Un usuario deberá tener entre 1 y 5 videojuegos relacionados con su perfil, de acuerdo con RF-88 y RF-89.
+- Solo podrán agregarse videojuegos aprobados y disponibles en el catálogo.
+- La validación del límite de videojuegos deberá realizarse en el servidor y, cuando sea necesario, mediante mecanismos de integridad de la base de datos.
+
+### Tabla: `Follows`
+
+Representa las relaciones mediante las cuales un usuario sigue a otro.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_seguidor | `UUID` | PK, FK → Usuario | Usuario que establece el seguimiento. |
+| id_seguido | `UUID` | PK, FK → Usuario | Usuario que recibe el seguimiento. |
+| fecha_seguimiento | `TIMESTAMP` | NOT NULL | Fecha en que se estableció la relación. |
+
+**Consideraciones:**
+- La combinación de `id_seguidor` e `id_seguido` será única.
+- Un usuario no podrá seguirse a sí mismo.
+- La relación deberá eliminarse cuando el usuario deje de seguir a otro.
+- No deberá existir una relación de seguimiento entre dos usuarios cuando exista un bloqueo entre ellos.
+
+### Tabla: `Bloqueos`
+
+Almacena las relaciones de bloqueo establecidas entre usuarios.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_usuario_bloqueador | `UUID` | PK, FK → Usuario | Usuario que establece el bloqueo. |
+| id_usuario_bloqueado | `UUID` | PK, FK → Usuario | Usuario que recibe el bloqueo. |
+| fecha_bloqueo | `TIMESTAMP` | NOT NULL | Fecha en que se estableció el bloqueo. |
+
+**Consideraciones:**
+- La combinación de ambos identificadores será única.
+- Un usuario no podrá bloquearse a sí mismo.
+- Al establecer un bloqueo deberán eliminarse las relaciones de seguimiento existentes entre ambos usuarios.
+- El bloqueo deberá impedir el acceso mutuo a perfiles y publicaciones, así como el seguimiento y la mensajería privada.
+- Al desbloquear a un usuario se eliminará el registro correspondiente, pero no se restaurarán automáticamente las relaciones de seguimiento.
+
+### Tabla: `Silenciamientos`
+
+Almacena las relaciones mediante las cuales un usuario oculta las publicaciones y notificaciones de otro.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_usuario_silenciador | `UUID` | PK, FK → Usuario | Usuario que establece el silenciamiento. |
+| id_usuario_silenciado | `UUID` | PK, FK → Usuario | Usuario cuyas publicaciones y notificaciones se ocultan. |
+| fecha_silenciamiento | `TIMESTAMP` | NOT NULL | Fecha en que se estableció el silenciamiento. |
+
+**Consideraciones:**
+- La combinación de ambos identificadores será única.
+- Un usuario no podrá silenciarse a sí mismo.
+- El silenciamiento no deberá eliminar la relación de seguimiento.
+- El usuario silenciado no deberá recibir una notificación por esta acción.
+- Al dejar de silenciar se eliminará la relación, sin modificar las demás relaciones existentes.
+
+---
+
+## Publicación
+
+Representa el contenido que un usuario comparte en la plataforma. Una publicación podrá contener texto, una imagen o ambos, según las reglas que finalmente se definan para el formulario.
+
+### Tabla: `Publicacion`
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_publicacion | `UUID` | PK, NOT NULL | Identificador único de la publicación. |
+| id_usuario | `UUID` | FK → Usuario, NOT NULL | Usuario que creó la publicación. |
+| id_videojuego | `UUID` | FK → Videojuego, NOT NULL | Videojuego relacionado con la publicación. |
+| id_grupo | `UUID` | FK → Comunidad, NULL | Grupo al que pertenece la publicación, si corresponde. |
+| texto | `TEXT` | NULL | Contenido textual de la publicación. |
+| imagen | `VARCHAR(500)` | NULL | URL o ruta de almacenamiento de la imagen. |
+| fecha_creacion | `TIMESTAMP` | NOT NULL | Fecha y hora de creación. |
+| fecha_actualizacion | `TIMESTAMP` | NULL | Fecha de la última modificación, si se permite editar publicaciones. |
+| estado | `ENUM` | NOT NULL | Estado de la publicación, por ejemplo: activa o eliminada. |
+
+**Consideraciones:**
+- Cada publicación deberá estar asociada con un único usuario.
+- Cada publicación deberá relacionarse con un videojuego.
+- `id_grupo` será opcional, ya que una publicación puede realizarse fuera de una comunidad.
+- Cuando una publicación pertenezca a un grupo, el videojuego seleccionado deberá estar relacionado con ese grupo.
+- El sistema deberá impedir que un usuario elimine publicaciones de otros usuarios.
+- El almacenamiento de imágenes se realizará externamente, conservando su referencia en la base de datos.
+- La obligatoriedad del texto y la regla para permitir publicaciones únicamente con imágenes quedan por definir.
+
+### Tabla: `Comentario`
+
+Representa los comentarios que los usuarios realizan sobre las publicaciones.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_comentario | `UUID` | PK, NOT NULL | Identificador único del comentario. |
+| id_publicacion | `UUID` | FK → Publicacion, NOT NULL | Publicación a la que pertenece el comentario. |
+| id_usuario | `UUID` | FK → Usuario, NOT NULL | Usuario que realizó el comentario. |
+| texto | `TEXT` | NOT NULL | Contenido del comentario. |
+| fecha_creacion | `TIMESTAMP` | NOT NULL | Fecha y hora de creación del comentario. |
+
+**Consideraciones:**
+- Cada comentario estará asociado con una publicación y un usuario.
+- El comentario deberá conservar su autoría y fecha de creación.
+- La longitud máxima del texto queda por definir.
+- El usuario solo podrá eliminar sus propios comentarios si esa funcionalidad se incorpora al alcance.
+
+### Tabla: `Reaccion`
+
+Representa las reacciones de tipo "Me gusta" realizadas por los usuarios sobre las publicaciones.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_usuario | `UUID` | PK, FK → Usuario | Usuario que realiza la reacción. |
+| id_publicacion | `UUID` | PK, FK → Publicacion | Publicación que recibe la reacción. |
+| fecha_reaccion | `TIMESTAMP` | NOT NULL | Fecha en que se realizó la reacción. |
+
+**Consideraciones:**
+- La combinación de `id_usuario` e `id_publicacion` será única.
+- Un usuario podrá reaccionar una sola vez a una publicación.
+- Al retirar la reacción se eliminará el registro correspondiente.
+- La cantidad de reacciones podrá obtenerse mediante una consulta sobre esta tabla.
+
+---
+
+## Videojuego
+
+Se propone separar los videojuegos aprobados de las solicitudes de registro. De esta manera, los usuarios únicamente podrán relacionar con sus perfiles, publicaciones y comunidades videojuegos que ya estén disponibles en el catálogo.
+
+### Tabla: `Videojuegos`
+
+Representa el catálogo de videojuegos aprobados y disponibles en la plataforma.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_videojuego | `UUID` | PK, NOT NULL | Identificador único del videojuego. |
+| nombre | `VARCHAR(150)` | UNIQUE, NOT NULL | Nombre del videojuego. |
+| descripcion | `TEXT` | NOT NULL | Descripción general del videojuego. |
+| genero | `VARCHAR(100)` | NULL | Género del videojuego. |
+| plataforma | `VARCHAR(100)` | NULL | Plataforma o plataformas en las que está disponible. |
+| portada | `VARCHAR(500)` | NULL | URL o ruta de almacenamiento de la portada. |
+| informacion_adicional | `TEXT` | NULL | Información complementaria. |
+| fecha_registro | `TIMESTAMP` | NOT NULL | Fecha en que se incorporó al catálogo. |
+| estado | `ENUM` | NOT NULL | Estado del videojuego, por ejemplo: activo o deshabilitado. |
+
+**Consideraciones:**
+- Solo los videojuegos aprobados deberán encontrarse disponibles para su selección en los formularios de publicaciones, perfiles y comunidades.
+- El nombre del videojuego deberá validarse para evitar registros duplicados.
+- El género y la plataforma podrán utilizar catálogos controlados si el equipo decide definirlos.
+- La portada se almacenará externamente y se conservará su referencia.
+- La administración de esta entidad corresponderá al administrador de la plataforma.
+
+### Tabla: `SolicitudesVideojuegos`
+
+Representa las solicitudes que realizan los jugadores para registrar nuevos videojuegos.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_solicitud | `UUID` | PK, NOT NULL | Identificador único de la solicitud. |
+| id_usuario_solicitante | `UUID` | FK → Usuario, NOT NULL | Jugador que realiza la solicitud. |
+| nombre | `VARCHAR(150)` | NOT NULL | Nombre del videojuego propuesto. |
+| descripcion | `TEXT` | NOT NULL | Descripción del videojuego. |
+| genero | `VARCHAR(100)` | NULL | Género propuesto. |
+| plataforma | `VARCHAR(100)` | NULL | Plataforma o plataformas propuestas. |
+| portada | `VARCHAR(500)` | NULL | URL o ruta de almacenamiento de la portada propuesta. |
+| informacion_adicional | `TEXT` | NULL | Información complementaria. |
+| estado | `ENUM('PENDIENTE', 'ACEPTADA', 'RECHAZADA')` | NOT NULL | Estado actual de la solicitud. |
+| id_administrador | `UUID` | FK → Usuario, NULL | Administrador que revisó la solicitud. |
+| motivo_rechazo | `TEXT` | NULL | Explicación de la decisión cuando se rechaza. |
+| fecha_solicitud | `TIMESTAMP` | NOT NULL | Fecha de envío de la solicitud. |
+| fecha_revision | `TIMESTAMP` | NULL | Fecha en que se tomó una decisión. |
+| id_videojuego_aprobado | `UUID` | FK → Videojuego, NULL | Videojuego creado en el catálogo cuando se acepta la solicitud. |
+
+**Consideraciones:**
+- Toda solicitud deberá estar asociada con el usuario que la realizó.
+- El estado inicial será `PENDIENTE`.
+- El administrador de la plataforma será responsable de aceptar o rechazar la solicitud.
+- Cuando una solicitud sea aceptada, se deberá crear o habilitar el registro correspondiente en `Videojuego`.
+- Cuando una solicitud sea rechazada, podrá almacenarse el motivo de rechazo.
+- El campo `id_videojuego_aprobado` permitirá relacionar la solicitud con el videojuego resultante de su aprobación.
+
+---
+
+## Comunidad
+
+Representa los grupos de usuarios de la plataforma. Cada comunidad estará relacionada con uno o varios videojuegos y podrá configurarse como pública o privada.
+
+### Tabla: `Comunidades`
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_comunidad | `UUID` | PK, NOT NULL | Identificador único de la comunidad. |
+| id_creador | `UUID` | FK → Usuario, NOT NULL | Usuario que creó la comunidad. |
+| nombre | `VARCHAR(150)` | NOT NULL | Nombre de la comunidad. |
+| descripcion | `TEXT` | NOT NULL | Descripción de la finalidad de la comunidad. |
+| tipo | `ENUM('PUBLICO', 'PRIVADO')` | NOT NULL | Define la visibilidad y el acceso a la comunidad. |
+| imagen | `VARCHAR(500)` | NULL | URL o ruta de almacenamiento de la imagen de la comunidad. |
+| reglas | `TEXT` | NULL | Reglas establecidas para los integrantes. |
+| fecha_creacion | `TIMESTAMP` | NOT NULL | Fecha en que se creó la comunidad. |
+| fecha_actualizacion | `TIMESTAMP` | NULL | Fecha de la última modificación. |
+| estado | `ENUM` | NOT NULL | Estado de la comunidad, por ejemplo: activa o eliminada. |
+
+**Consideraciones:**
+- Cada comunidad deberá tener un usuario creador.
+- El creador será inicialmente el administrador de la comunidad.
+- La comunidad deberá configurarse como pública o privada.
+- Una comunidad deberá relacionarse con un mínimo de 1 y un máximo de 5 videojuegos aprobados.
+- La imagen se almacenará externamente y se conservará su referencia.
+- El administrador podrá actualizar la información y configuración de la comunidad.
+
+### Tabla: `ComunidadesVideojuegos`
+
+Representa la relación entre las comunidades y los videojuegos asociados.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_comunidad | `UUID` | PK, FK → Comunidad | Comunidad relacionada. |
+| id_videojuego | `UUID` | PK, FK → Videojuego | Videojuego asociado. |
+| fecha_asociacion | `TIMESTAMP` | NOT NULL | Fecha en que se relacionó el videojuego con la comunidad. |
+
+**Consideraciones:**
+- La combinación de `id_comunidad` e `id_videojuego` será la clave primaria compuesta.
+- Una comunidad deberá tener entre 1 y 5 videojuegos relacionados.
+- No se permitirá relacionar videojuegos que no estén aprobados.
+- El administrador podrá agregar, eliminar o modificar los videojuegos relacionados.
+- Al eliminar un videojuego relacionado, la comunidad deberá conservar al menos uno.
+
+### Tabla: `IntegrantesComunidad`
+
+Representa la pertenencia de los usuarios a las comunidades.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_comunidad | `UUID` | PK, FK → Comunidad | Comunidad a la que pertenece el usuario. |
+| id_usuario | `UUID` | PK, FK → Usuario | Usuario integrante. |
+| rol | `ENUM('ADMINISTRADOR', 'INTEGRANTE')` | NOT NULL | Rol del usuario dentro de la comunidad. |
+| fecha_ingreso | `TIMESTAMP` | NOT NULL | Fecha en que el usuario ingresó a la comunidad. |
+
+**Consideraciones:**
+- La combinación de `id_comunidad` e `id_usuario` será única.
+- El creador de la comunidad deberá registrarse como administrador.
+- Los usuarios que ingresen a una comunidad tendrán inicialmente el rol de integrante, salvo que se les otorguen permisos de administración.
+- Solo los administradores podrán gestionar las solicitudes de ingreso, modificar la configuración o eliminar integrantes.
+- Los usuarios podrán pertenecer a varias comunidades.
+
+### Tabla: `SolicitudesIngresoComunidad`
+
+Representa las solicitudes de ingreso que realizan los usuarios a comunidades privadas.
+
+| Campo | Tipo de dato | Restricciones | Descripción |
+|---|---|---|---|
+| id_solicitud | `UUID` | PK, NOT NULL | Identificador único de la solicitud. |
+| id_comunidad | `UUID` | FK → Comunidad, NOT NULL | Comunidad privada a la que se desea ingresar. |
+| id_usuario | `UUID` | FK → Usuario, NOT NULL | Usuario que realiza la solicitud. |
+| mensaje | `TEXT` | NULL | Mensaje opcional del usuario. |
+| estado | `ENUM('PENDIENTE', 'ACEPTADA', 'RECHAZADA')` | NOT NULL | Estado de la solicitud. |
+| fecha_solicitud | `TIMESTAMP` | NOT NULL | Fecha en que se realizó la solicitud. |
+| fecha_respuesta | `TIMESTAMP` | NULL | Fecha en que el administrador respondió. |
+| id_administrador_respuesta | `UUID` | FK → Usuario, NULL | Administrador que tomó la decisión. |
+| comentario_respuesta | `TEXT` | NULL | Comentario opcional del administrador. |
+
+**Consideraciones:**
+- El estado inicial de una solicitud será `PENDIENTE`.
+- Una solicitud aceptada deberá generar un registro en `IntegranteComunidad`.
+- Una solicitud rechazada no deberá conceder acceso a la comunidad.
+- No deberán existir solicitudes pendientes duplicadas del mismo usuario para una misma comunidad.
+- Esta estructura se utilizará para comunidades privadas. Los usuarios podrán unirse directamente a comunidades públicas.
+
+---
+
+## 5. Relaciones principales
+
+Las siguientes relaciones describen cómo se conectan las entidades propuestas:
+
+| Entidad principal | Entidad relacionada | Relación | Descripción |
+|---|---|---|---|
+| Usuario | UsuarioVideojuego | 1:N | Un usuario puede tener entre 1 y 5 videojuegos en su biblioteca personal. |
+| Videojuego | UsuarioVideojuego | 1:N | Un videojuego puede aparecer en las bibliotecas de varios usuarios. |
+| Usuario | Publicacion | 1:N | Un usuario puede crear varias publicaciones. |
+| Videojuego | Publicacion | 1:N | Un videojuego puede estar relacionado con varias publicaciones. |
+| Comunidad | Publicacion | 1:N | Una comunidad puede contener varias publicaciones. |
+| Usuario | Comentario | 1:N | Un usuario puede realizar varios comentarios. |
+| Publicacion | Comentario | 1:N | Una publicación puede tener varios comentarios. |
+| Usuario | Reaccion | 1:N | Un usuario puede reaccionar a varias publicaciones. |
+| Publicacion | Reaccion | 1:N | Una publicación puede recibir varias reacciones. |
+| Usuario | Comunidad | N:M | Los usuarios pueden pertenecer a varias comunidades y cada comunidad puede tener varios integrantes. |
+| Comunidad | Videojuego | N:M | Una comunidad puede relacionarse con varios videojuegos y un videojuego puede estar relacionado con varias comunidades. |
+| Usuario | Seguimiento | N:M | Los usuarios pueden seguir a otros usuarios. |
+| Usuario | Bloqueo | N:M | Los usuarios pueden establecer bloqueos entre cuentas. |
+| Usuario | Silenciamiento | N:M | Los usuarios pueden silenciar a otras cuentas. |
+| Usuario | SolicitudVideojuego | 1:N | Un usuario puede realizar varias solicitudes de registro de videojuegos. |
+| Usuario | SolicitudIngresoComunidad | 1:N | Un usuario puede solicitar ingresar a varias comunidades privadas. |
+| Comunidad | SolicitudIngresoComunidad | 1:N | Una comunidad privada puede recibir varias solicitudes de ingreso. |
+
+## 6. Reglas de integridad y validaciones generales
+
+Las siguientes reglas deberán aplicarse para mantener la consistencia de la información:
+
+1. **Identificadores:** todas las entidades principales deberán contar con una clave primaria única de tipo `UUID`.
+2. **Relaciones:** las claves foráneas deberán garantizar que no existan referencias a usuarios, publicaciones, videojuegos o comunidades inexistentes.
+3. **Usuarios:** el nombre de usuario y el correo electrónico deberán ser únicos.
+4. **Contraseñas:** únicamente se almacenarán hashes de contraseñas, nunca contraseñas en texto plano.
+5. **Biblioteca personal:** cada usuario deberá mantener entre 1 y 5 videojuegos aprobados relacionados con su perfil.
+6. **Publicaciones:** cada publicación deberá pertenecer a un usuario y estar relacionada con un videojuego.
+7. **Publicaciones en comunidades:** cuando una publicación pertenezca a una comunidad, el videojuego seleccionado deberá estar relacionado con ella.
+8. **Comunidades:** cada comunidad deberá tener entre 1 y 5 videojuegos aprobados relacionados.
+9. **Privacidad:** las comunidades privadas solo podrán ser consultadas por sus integrantes autorizados, de acuerdo con las reglas de acceso.
+10. **Seguimiento:** no se permitirán relaciones de seguimiento duplicadas ni relaciones de un usuario consigo mismo.
+11. **Bloqueo:** al bloquear a otro usuario deberán eliminarse las relaciones de seguimiento existentes entre ambas cuentas.
+12. **Silenciamiento:** el silenciamiento no deberá modificar las relaciones de seguimiento.
+13. **Solicitudes:** las solicitudes de ingreso a comunidades privadas y de registro de videojuegos deberán conservar su estado y fechas de resolución.
+14. **Almacenamiento multimedia:** las imágenes deberán almacenarse en un servicio o sistema de archivos externo, conservando en la base de datos su URL o referencia.
+15. **Eliminación:** las operaciones de eliminación deberán respetar las relaciones existentes y las reglas de conservación de información que defina el proyecto.
+
+## 7. Decisiones pendientes de definición
+
+| Elemento | Decisión pendiente |
+|---|---|
+| Género del usuario | Definir las opciones permitidas para el campo `genero`. |
+| Edad mínima | Definir si existirá una restricción de edad para registrar una cuenta. |
+| Nombre visible | Confirmar su longitud máxima y si será obligatorio. |
+| Publicaciones | Definir si se permitirá publicar únicamente texto, únicamente imagen o si ambos serán obligatorios. |
+| Imágenes | Definir formatos, dimensiones y tamaño máximo permitido. |
+| Videojuegos | Definir los catálogos de géneros y plataformas. |
+| Comunidades | Definir si el nombre deberá ser único globalmente o únicamente dentro de ciertos criterios. |
+| Eliminación de cuentas | Definir qué sucederá con las publicaciones, comentarios y comunidades creadas por el usuario. |
+| Eliminación de comunidades | Definir qué sucederá con las publicaciones y los integrantes cuando se elimine una comunidad. |
+| Eliminación de videojuegos | Definir el tratamiento de las relaciones existentes cuando un videojuego sea deshabilitado. |
 
