@@ -26,7 +26,7 @@ La primera versión no incluirá las siguientes funcionalidades:
 - Búsqueda avanzada de usuarios, publicaciones o videojuegos.
 - transmisiones en vivo.
 - Funcionalidades diferenciadas para jugadores, desarrolladores y creadores de contenido.
-- Recomendaciones personalizadas mediante inteligencia artificial.
+- Recomendaciones de videojuegos o amistades personalizadas mediante inteligencia artificial.
 - Funciones avanzadas de moderación y administración de contenido.
 
 ## 2. Prioridades de desarrollo
