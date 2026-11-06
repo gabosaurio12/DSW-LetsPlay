@@ -11,6 +11,7 @@ El proyecto es una implementación web de una red social para Gamers con el obje
 - .agents/ guardará skills de los agentes de IA.
 - src-client/ tendrá el proyecto del lado del cliente (react).
 - src-server/ tendrá el proyecto del lado del servidor (express.js).
+- Nota real (decision 2026-11-06): el scaffold vive en apps/frontend (Vite + React) y apps/backend (Express stub), no en src-client/src-server; falta decidir si se migra todo a src-*.
 
 ## Convenciones
 - El texto de la interfaz debe soportar internacionalización (i18n) para al menos español e inglés.
