@@ -44,7 +44,7 @@ WHERE u."account_status" = 'ACTIVE'
 
 CREATE VIEW "v_user_post" AS
 SELECT p."id_post", p."id_user", p."id_videogame", p."id_community",
-       p."content", p."image_url", p."created_at", p."updated_at"
+       p."content", p."image_url", p."is_spoiler", p."created_at", p."updated_at"
 FROM "Post" p
 WHERE p."status" = 'ACTIVE'
   AND (
@@ -69,7 +69,7 @@ WHERE p."status" = 'ACTIVE'
   );
 
 CREATE VIEW "v_user_comment" AS
-SELECT c."id_comment", c."id_post", c."id_user", c."content", c."created_at"
+SELECT c."id_comment", c."id_post", c."id_user", c."content", c."is_spoiler", c."created_at"
 FROM "Comment" c
 WHERE EXISTS (SELECT 1 FROM "v_user_post" p WHERE p."id_post" = c."id_post")
   AND NOT EXISTS (
@@ -100,6 +100,47 @@ SELECT "id_report", "content_type", "id_reported_content", "reason",
 FROM "Report"
 WHERE "id_reporter" = current_setting('app.current_user_id', true)::uuid;
 
+CREATE VIEW "v_user_poll" AS
+SELECT p."id_poll", p."id_post", p."question", p."closes_at", p."status", p."created_at"
+FROM "Poll" p
+WHERE EXISTS (SELECT 1 FROM "v_user_post" v WHERE v."id_post" = p."id_post");
+
+CREATE VIEW "v_user_poll_option" AS
+SELECT o."id_option", o."id_poll", o."text", o."position"
+FROM "PollOption" o
+WHERE EXISTS (SELECT 1 FROM "v_user_poll" p WHERE p."id_poll" = o."id_poll");
+
+CREATE VIEW "v_user_poll_result" AS
+SELECT v."id_poll", v."id_option", COUNT(*) AS "vote_count"
+FROM "PollVote" v
+WHERE EXISTS (SELECT 1 FROM "v_user_poll" p WHERE p."id_poll" = v."id_poll")
+GROUP BY v."id_poll", v."id_option";
+
+CREATE VIEW "v_user_gamer_preference" AS
+SELECT p."id_preference", p."id_user", p."favorite_genres", p."active_platforms",
+       p."availability", p."preferred_style", p."looking_to_play", p."updated_at"
+FROM "GamerPreference" p
+WHERE NOT EXISTS (
+  SELECT 1 FROM "Blocks" b
+  WHERE (b."id_blocker" = p."id_user"
+         AND b."id_blocked" = current_setting('app.current_user_id', true)::uuid)
+     OR (b."id_blocker" = current_setting('app.current_user_id', true)::uuid
+         AND b."id_blocked" = p."id_user")
+);
+
+CREATE VIEW "v_user_lfg_post" AS
+SELECT l."id_lfg", l."id_user", l."id_videogame", l."platform", l."spots_available",
+       l."scheduled_time", l."description", l."accepts_beginners", l."status", l."created_at"
+FROM "LfgPost" l
+WHERE l."status" = 'OPEN'
+  AND NOT EXISTS (
+    SELECT 1 FROM "Blocks" b
+    WHERE (b."id_blocker" = l."id_user"
+           AND b."id_blocked" = current_setting('app.current_user_id', true)::uuid)
+       OR (b."id_blocker" = current_setting('app.current_user_id', true)::uuid
+           AND b."id_blocked" = l."id_user")
+  );
+
 -- Read permissions
 GRANT SELECT ON "v_public_videogame", "v_public_community" TO letsplay_guest;
 
@@ -111,7 +152,12 @@ GRANT SELECT ON
    "v_user_comment",
    "v_user_conversation",
    "v_user_message",
-   "v_user_report"
+   "v_user_report",
+   "v_user_poll",
+   "v_user_poll_option",
+   "v_user_poll_result",
+   "v_user_gamer_preference",
+   "v_user_lfg_post"
 TO letsplay_user;
 
 -- Write permissions

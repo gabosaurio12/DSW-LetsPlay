@@ -61,6 +61,24 @@ CREATE TYPE "report_status" AS ENUM (
   'CLOSED'
 );
 
+CREATE TYPE "poll_status" AS ENUM (
+  'ACTIVE',
+  'CLOSED'
+);
+
+CREATE TYPE "play_style" AS ENUM (
+  'CASUAL',
+  'COMPETITIVE',
+  'COOPERATIVE',
+  'INDIFFERENT'
+);
+
+CREATE TYPE "lfg_post_status" AS ENUM (
+  'OPEN',
+  'COMPLETE',
+  'CANCELLED'
+);
+
 CREATE TABLE "User" (
   "id_user" uuid PRIMARY KEY,
   "username" varchar(12) UNIQUE NOT NULL,
@@ -82,6 +100,20 @@ CREATE TABLE "UserVideogames" (
   "id_videogame" uuid,
   "added_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("id_user", "id_videogame")
+);
+
+CREATE TABLE "GamerPreference" (
+  "id_preference" uuid PRIMARY KEY,
+  "id_user" uuid NOT NULL UNIQUE,
+  "favorite_genres" jsonb NOT NULL,
+  "active_platforms" jsonb NOT NULL,
+  "availability" jsonb NOT NULL,
+  "preferred_style" play_style NOT NULL DEFAULT 'INDIFFERENT',
+  "looking_to_play" boolean NOT NULL DEFAULT true,
+  "updated_at" timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT "chk_preference_genres_range" CHECK (jsonb_array_length("favorite_genres") BETWEEN 1 AND 5),
+  CONSTRAINT "chk_preference_platforms_range" CHECK (jsonb_array_length("active_platforms") BETWEEN 1 AND 5),
+  CONSTRAINT "chk_preference_availability_range" CHECK (jsonb_array_length("availability") >= 1)
 );
 
 CREATE TABLE "Follows" (
@@ -115,6 +147,7 @@ CREATE TABLE "Post" (
   "id_community" uuid,
   "content" text,
   "image_url" varchar(500),
+  "is_spoiler" boolean NOT NULL DEFAULT false,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz,
   "status" post_status NOT NULL,
@@ -129,8 +162,10 @@ CREATE TABLE "Comment" (
   "id_post" uuid NOT NULL,
   "id_user" uuid NOT NULL,
   "content" text NOT NULL,
+  "is_spoiler" boolean NOT NULL DEFAULT false,
   "created_at" timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT "chk_comment_not_empty" CHECK (btrim("content") <> '')
+  CONSTRAINT "chk_comment_not_empty" CHECK (btrim("content") <> ''),
+  CONSTRAINT "chk_comment_max_length" CHECK (char_length("content") <= 500)
 );
 
 CREATE TABLE "Reaction" (
@@ -138,6 +173,50 @@ CREATE TABLE "Reaction" (
   "id_post" uuid,
   "reacted_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("id_user", "id_post")
+);
+
+CREATE TABLE "Poll" (
+  "id_poll" uuid PRIMARY KEY,
+  "id_post" uuid NOT NULL UNIQUE,
+  "question" varchar(250) NOT NULL,
+  "closes_at" timestamptz,
+  "status" poll_status NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT "chk_poll_question" CHECK (char_length("question") BETWEEN 5 AND 250 AND btrim("question") <> '')
+);
+
+CREATE TABLE "PollOption" (
+  "id_option" uuid PRIMARY KEY,
+  "id_poll" uuid NOT NULL,
+  "text" varchar(100) NOT NULL,
+  "position" int NOT NULL,
+  CONSTRAINT "chk_poll_option_text" CHECK (btrim("text") <> ''),
+  CONSTRAINT "chk_poll_option_position" CHECK ("position" BETWEEN 1 AND 5),
+  CONSTRAINT "uq_poll_option_position" UNIQUE ("id_poll", "position")
+);
+
+CREATE TABLE "PollVote" (
+  "id_vote" uuid PRIMARY KEY,
+  "id_poll" uuid NOT NULL,
+  "id_option" uuid NOT NULL,
+  "id_user" uuid NOT NULL,
+  "voted_at" timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT "uq_poll_vote_user" UNIQUE ("id_poll", "id_user")
+);
+
+CREATE TABLE "LfgPost" (
+  "id_lfg" uuid PRIMARY KEY,
+  "id_user" uuid NOT NULL,
+  "id_videogame" uuid NOT NULL,
+  "platform" varchar(50) NOT NULL,
+  "spots_available" int NOT NULL,
+  "scheduled_time" varchar(100) NOT NULL,
+  "description" text NOT NULL,
+  "accepts_beginners" boolean NOT NULL DEFAULT true,
+  "status" lfg_post_status NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT "chk_lfg_spots_range" CHECK ("spots_available" BETWEEN 1 AND 16),
+  CONSTRAINT "chk_lfg_description_length" CHECK (char_length(btrim("description")) BETWEEN 10 AND 500)
 );
 
 CREATE TABLE "Videogames" (
@@ -352,6 +431,22 @@ ALTER TABLE "Message" ADD FOREIGN KEY ("id_sender") REFERENCES "User" ("id_user"
 
 ALTER TABLE "Message" ADD FOREIGN KEY ("id_recipient") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
 
+ALTER TABLE "GamerPreference" ADD FOREIGN KEY ("id_user") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Poll" ADD FOREIGN KEY ("id_post") REFERENCES "Post" ("id_post") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "PollOption" ADD FOREIGN KEY ("id_poll") REFERENCES "Poll" ("id_poll") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "PollVote" ADD FOREIGN KEY ("id_poll") REFERENCES "Poll" ("id_poll") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "PollVote" ADD FOREIGN KEY ("id_option") REFERENCES "PollOption" ("id_option") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "PollVote" ADD FOREIGN KEY ("id_user") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "LfgPost" ADD FOREIGN KEY ("id_user") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "LfgPost" ADD FOREIGN KEY ("id_videogame") REFERENCES "Videogames" ("id_videogame") DEFERRABLE INITIALLY IMMEDIATE;
+
 -- Deferred constraint triggers let a full 1-5 list be replaced in one
 -- transaction: deleting all rows and inserting the new ones is valid as long
 -- as the final count is within range.
@@ -438,6 +533,9 @@ BEFORE UPDATE ON "Post" FOR EACH ROW EXECUTE FUNCTION "fn_set_updated_at"();
 
 CREATE TRIGGER "trg_community_updated_at"
 BEFORE UPDATE ON "Communities" FOR EACH ROW EXECUTE FUNCTION "fn_set_updated_at"();
+
+CREATE TRIGGER "trg_gamer_preference_updated_at"
+BEFORE UPDATE ON "GamerPreference" FOR EACH ROW EXECUTE FUNCTION "fn_set_updated_at"();
 
 -- A CHECK cannot consult other rows, so message participants and the block
 -- restriction from CU-35 are validated here instead.

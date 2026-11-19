@@ -65,6 +65,24 @@ enum report_status {
   CLOSED
 }
 
+enum poll_status {
+  ACTIVE
+  CLOSED
+}
+
+enum play_style {
+  CASUAL
+  COMPETITIVE
+  COOPERATIVE
+  INDIFFERENT
+}
+
+enum lfg_post_status {
+  OPEN
+  COMPLETE
+  CANCELLED
+}
+
 Table User {
   id_user uuid [pk]
   username varchar(12) [unique, not null]
@@ -88,6 +106,23 @@ Table UserVideogames {
   id_user uuid [pk]
   id_videogame uuid [pk]
   added_at timestamptz [not null, default: `now()`]
+}
+
+Table GamerPreference {
+  id_preference uuid [pk]
+  id_user uuid [not null, unique]
+  favorite_genres jsonb [not null]
+  active_platforms jsonb [not null]
+  availability jsonb [not null]
+  preferred_style play_style [not null, default: 'INDIFFERENT']
+  looking_to_play boolean [not null, default: true]
+  updated_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `jsonb_array_length(favorite_genres) BETWEEN 1 AND 5` [name: 'chk_preference_genres_range']
+    `jsonb_array_length(active_platforms) BETWEEN 1 AND 5` [name: 'chk_preference_platforms_range']
+    `jsonb_array_length(availability) >= 1` [name: 'chk_preference_availability_range']
+  }
 }
 
 Table Follows {
@@ -127,6 +162,7 @@ Table Post {
   id_community uuid
   content text
   image_url varchar(500)
+  is_spoiler boolean [not null, default: false]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz
   status post_status [not null]
@@ -141,10 +177,12 @@ Table Comment {
   id_post uuid [not null]
   id_user uuid [not null]
   content text [not null]
+  is_spoiler boolean [not null, default: false]
   created_at timestamptz [not null, default: `now()`]
 
   checks {
     `btrim(content) <> ''` [name: 'chk_comment_not_empty']
+    `char_length(content) <= 500` [name: 'chk_comment_max_length']
   }
 }
 
@@ -152,6 +190,65 @@ Table Reaction {
   id_user uuid [pk]
   id_post uuid [pk]
   reacted_at timestamptz [not null, default: `now()`]
+}
+
+Table Poll {
+  id_poll uuid [pk]
+  id_post uuid [not null, unique]
+  question varchar(250) [not null]
+  closes_at timestamptz
+  status poll_status [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `char_length(question) BETWEEN 5 AND 250 AND btrim(question) <> ''` [name: 'chk_poll_question']
+  }
+}
+
+Table PollOption {
+  id_option uuid [pk]
+  id_poll uuid [not null]
+  text varchar(100) [not null]
+  position int [not null]
+
+  indexes {
+    (id_poll, position) [unique, name: 'uq_poll_option_position']
+  }
+
+  checks {
+    `btrim(text) <> ''` [name: 'chk_poll_option_text']
+    `position BETWEEN 1 AND 5` [name: 'chk_poll_option_position']
+  }
+}
+
+Table PollVote {
+  id_vote uuid [pk]
+  id_poll uuid [not null]
+  id_option uuid [not null]
+  id_user uuid [not null]
+  voted_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (id_poll, id_user) [unique, name: 'uq_poll_vote_user']
+  }
+}
+
+Table LfgPost {
+  id_lfg uuid [pk]
+  id_user uuid [not null]
+  id_videogame uuid [not null]
+  platform varchar(50) [not null]
+  spots_available int [not null]
+  scheduled_time varchar(100) [not null]
+  description text [not null]
+  accepts_beginners boolean [not null, default: true]
+  status lfg_post_status [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `spots_available BETWEEN 1 AND 16` [name: 'chk_lfg_spots_range']
+    `char_length(btrim(description)) BETWEEN 10 AND 500` [name: 'chk_lfg_description_length']
+  }
 }
 
 Table Videogames {
@@ -315,3 +412,11 @@ Ref: Conversation.id_user_2 > User.id_user
 Ref: Message.id_conversation > Conversation.id_conversation
 Ref: Message.id_sender > User.id_user
 Ref: Message.id_recipient > User.id_user
+Ref: GamerPreference.id_user > User.id_user
+Ref: Poll.id_post > Post.id_post
+Ref: PollOption.id_poll > Poll.id_poll
+Ref: PollVote.id_poll > Poll.id_poll
+Ref: PollVote.id_option > PollOption.id_option
+Ref: PollVote.id_user > User.id_user
+Ref: LfgPost.id_user > User.id_user
+Ref: LfgPost.id_videogame > Videogames.id_videogame
