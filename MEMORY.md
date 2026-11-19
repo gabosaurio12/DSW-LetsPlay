@@ -2,24 +2,26 @@
 Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo que ya no aporte.
 
 ## Estado actual
-- Fase de análisis y diseño; aún no hay código (el repo es solo docs/).
-- Docs numerados completados: definición, planificación, requisitos (RF-01…RF-97), especificación funcional, casos de uso (CU-01…CU-19), arquitectura (por diagramas), modelo WAE.
-- Pendientes: 1.5.1.Pruebas.md y 1.5.3.SeguridadAceptacion.md están vacíos; falta 1.5.2. Hoy el equipo termina de migrar los archivos viejos sueltos al esquema numerado (tras eso, los sueltos quedan obsoletos).
-- Diagramas en docs/img/diagrams/; modelo EA en docs/artifacts/LetsPlay.eapx.
-- Directorios vacíos esperando código: src-client/, src-server/, .opencode/, .agents/.
+- Repositorio activo y clonado en DSW-LetsPlay (rama main al día).
+- Fase de análisis y diseño documental completada y en expansión.
+- Documento 1.2.4 creado: publicaciones, comentarios, reacciones, encuestas y spoilers formalizados (RF-117..126, CU-19 actualizado, CU-39..45, RN-24..26 y DDL PostgreSQL).
+- Docs canónicos existentes: 1.1.1, 1.1.2, 1.2.1, 1.2.2, 1.2.3, 1.2.4, 1.3.1, 1.3.2. Pendientes: 1.5.1, 1.5.2, 1.5.3.
+- En feat/gaming-survey se avanzó el componente WelcomeSurvey (React 19 + i18n propio).
+- Directorios base: apps/frontend, apps/backend; pendientes: .opencode/.
 
 ## Decisiones (y por qué)
-- Stack: React (src-client/) + Express (src-server/); PostgreSQL (BD principal) + MongoDB (assets/imagenes).
-- Primera versión solo escritorio; grupos públicos/privados ligados a 1–5 juegos, los privados requieren aprobación del admin.
-- i18n mínimo: español e inglés.
-- Nota: docs/1.1.1.Definicion.md menciona Next.js; se usa React + Express según AGENTS.md (a confirmar con el equipo).
+- Stack: React + Express.js; PostgreSQL (BD relacional) + MongoDB (archivos/multimedia).
+- Formato documental canónico: esquema numerado 1.X.* en docs/ (Markdown para Obsidian) sin enlaces absolutos file:///.
+- Módulo de interacción: encuestas (2-5 opciones, 1 voto por usuario inmutable), spoilers (es_spoiler booleano, blur por defecto, revelación en cliente), reacciones (toggle me gusta).
+- i18n obligatorio con diccionarios es/en para todos los textos de UI.
 
 ## Aprendizajes y errores a evitar
-- Priorizar siempre los docs numerados; los sueltos antiguos están duplicados.
-- Sin dependencias nuevas ni build steps hasta que exista código (ver Límites en AGENTS.md).
-- No usar links absolutos file:/// en los docs.
+- Priorizar siempre los documentos numerados; no duplicar en los archivos sueltos antiguos.
+- Trabajar directamente sobre el repo clonado (DSW-LetsPlay), no sobre carpetas zip descomprimidas.
+- Sin dependencias externas nuevas ni alterar build steps sin aprobación expresa.
+- Enlaces internos a documentación deben ser relativos al vault (docs/).
 
 ## Próximos pasos
-- Estandarizar pendiente de compañeros (hoy) → luego ignorar/borrar los sueltos si procede.
-- Completar 1.5.1 (pruebas) y 1.5.3 (seguridad/aceptación); crear 1.5.2.
-- Iniciar src-client/ y src-server/ bajo el esquema de estructura en AGENTS.md.
+- Integrar/alinear con el equipo la rama feat/gaming-survey a main si se aprueba.
+- Redactar casos y planes de prueba (1.5.1, 1.5.2) y criterios de seguridad/aceptación (1.5.3).
+- Comenzar implementación de endpoints de publicaciones, comentarios, encuestas y reacciones en apps/backend.
