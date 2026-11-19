@@ -3,16 +3,17 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 
 ## Estado actual
 - Repositorio activo y clonado en DSW-LetsPlay (rama main al día).
-- Fase de análisis y diseño documental completada y en expansión.
-- Documento 1.2.4 creado: publicaciones, comentarios, reacciones, encuestas y spoilers formalizados (RF-117..126, CU-19 actualizado, CU-39..45, RN-24..26 y DDL PostgreSQL).
-- Docs canónicos existentes: 1.1.1, 1.1.2, 1.2.1, 1.2.2, 1.2.3, 1.2.4, 1.3.1, 1.3.2. Pendientes: 1.5.1, 1.5.2, 1.5.3.
+- Docs canónicos existentes: 1.1.1, 1.1.2, 1.2.1, 1.2.2, 1.2.3, 1.2.4, 1.2.5, 1.3.1, 1.3.2. Pendientes: 1.5.1, 1.5.2, 1.5.3.
+- Documento 1.2.4: publicaciones, comentarios, reacciones, encuestas y spoilers formalizados (RF-117..126, CU-39..45).
+- Documento 1.2.5: recomendaciones y búsqueda de compañeros de juego LFG (RF-127..136, CU-46..51, RN-27..30, DDL).
 - En feat/gaming-survey se avanzó el componente WelcomeSurvey (React 19 + i18n propio).
 - Directorios base: apps/frontend, apps/backend; pendientes: .opencode/.
 
 ## Decisiones (y por qué)
 - Stack: React + Express.js; PostgreSQL (BD relacional) + MongoDB (archivos/multimedia).
 - Formato documental canónico: esquema numerado 1.X.* en docs/ (Markdown para Obsidian) sin enlaces absolutos file:///.
-- Módulo de interacción: encuestas (2-5 opciones, 1 voto por usuario inmutable), spoilers (es_spoiler booleano, blur por defecto, revelación en cliente), reacciones (toggle me gusta).
+- Recomendaciones deterministas: basadas en coincidencias de biblioteca personal, catálogo, plataformas y horarios (sin algoritmos opacos de IA en v1).
+- Búsqueda LFG: ponderación transparente (50% juegos en común, 30% plataformas, 20% horarios) con toggle "Looking to play".
 - i18n obligatorio con diccionarios es/en para todos los textos de UI.
 
 ## Aprendizajes y errores a evitar
@@ -24,4 +25,4 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 ## Próximos pasos
 - Integrar/alinear con el equipo la rama feat/gaming-survey a main si se aprueba.
 - Redactar casos y planes de prueba (1.5.1, 1.5.2) y criterios de seguridad/aceptación (1.5.3).
-- Comenzar implementación de endpoints de publicaciones, comentarios, encuestas y reacciones en apps/backend.
+- Conectar PreferenciaGamer y endpoints LFG al backend cuando comience la fase de endpoints.
