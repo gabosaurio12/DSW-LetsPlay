@@ -2,29 +2,38 @@
 Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo que ya no aporte.
 
 ## Estado actual
-- Fase de análisis y diseño completada en docs; hay código en apps/frontend (Vite + React 19) y apps/backend (Express stub sin rutas ni BD).
-- Feature activa: **ProfileForm** (apps/frontend/src) — formulario de perfil según docs/Formularios de envío de información.md §3: nombre visible (req., máx 100), descripción personal (opc.), foto de perfil por URL (opc.) y biblioteca de 1–5 videojuegos aprobados (req., RF-88/89).
-- Estructura del código: ProfileForm.jsx (estado/validación), components/{ProfileFormPanels,SelectableChip}.jsx, data/profileFormData.js, services/profileService.js, hooks/useTranslation.js, i18n/{i18n,es,en}.js, ProfileForm.css.
-- Ojo: el trabajo anterior (WelcomeSurvey) NO estaba commiteado y se perdió en un reset al commit "feat: initial application structure"; todo lo nuevo debe commitearse pronto.
-- Docs numerados completados: definición, plan, requisitos (RF-01..97), especificación, CU-01..19, arquitectura, WAE. Pendientes: 1.5.1, 1.5.2, 1.5.3.
-- Esquema relacional en `database/LetsPlay.dbml` (DBML/PostgreSQL): 14 tablas + 8 enums + 26 refs, tomados de docs/Formularios de envío de información.md. Sin notas ni comentarios, todo en inglés (tablas, columnas, enums). Pendiente: reportes (form. 13-14) y mensajes privados (form. 15) no tienen tabla en el doc.
+- Repo activo en DSW-LetsPlay (main al día). Docs canónicos: 1.1.1, 1.1.2, 1.2.1..1.2.5, 1.3.1, 1.3.2. Pendientes: 1.5.1, 1.5.2, 1.5.3.
+- 1.2.4: publicaciones, comentarios, reacciones, encuestas y spoilers (RF-117..126, CU-39..45). 1.2.5: recomendaciones y búsqueda LFG (RF-127..136, CU-46..51, RN-27..30, con DDL).
+- Feature activa: **ProfileForm** (apps/frontend/src) — nombre visible (req., máx 100), descripción, foto por URL y biblioteca de 1–5 juegos aprobados (RF-88/89).
+- Estructura del código: ProfileForm.jsx, components/{ProfileFormPanels,SelectableChip}.jsx, data/profileFormData.js, services/profileService.js, hooks/useTranslation.js, i18n/{i18n,es,en}.js, ProfileForm.css.
+- WelcomeSurvey: avanzado en feat/gaming-survey; en main se perdió con un reset → verificar antes de integrar.
+- `database/` validado y ampliado: `LetsPlay.dbml` (17 tablas, 11 enums, 34 refs, checks), `tables.sql`, `roles.sql`, `permissions.sql` y `README.md`. Probado en un cluster PostgreSQL 14 temporal: sintaxis, FKs, checks, triggers y permisos OK.
+- Directorios base: apps/frontend, apps/backend; pendiente: .opencode/.
 
 ## Decisiones (y por qué)
-- Estructura real: apps/frontend + apps/backend (decisión 2026-11-06); AGENTS.md conserva src-client/src-server como pendiente de migrar.
-- i18n: mini-diccionario propio (es/en) sin dependencias; regla 🚫 de AGENTS.md prohíbe añadir librerías.
-- Persistencia temporal en localStorage (clave "letsPlay.userProfile") con async/await + try/catch; el servicio valida la forma guardada y degrada a null si está corrupto.
-- Catálogo de videojuegos aprobados simulado en profileFormData.js hasta que exista el endpoint del backend.
-- Flujo UX: formulario → guardar → pantalla de confirmación con resumen → "Editar perfil" vuelve al formulario.
-- DBML: todo en inglés (tablas, columnas, enums y valores) pese a que el doc está en español; enums de estado con valores provisionales del doc. Sin notas ni comentarios (decisión del usuario).
+- Stack: React + Express.js; PostgreSQL (relacional) + MongoDB (archivos/multimedia). Estructura real apps/*; AGENTS.md conserva src-client/src-server como pendiente de migrar.
+- Formato documental canónico: esquema numerado 1.X.* en docs/ (Markdown para Obsidian), sin enlaces absolutos file:///.
+- i18n: mini-diccionario propio es/en sin dependencias (regla 🚫 de AGENTS.md). Persistencia temporal en localStorage ("letsPlay.userProfile") con validación y degradación a null.
+- Catálogo de juegos simulado en profileFormData.js hasta existir el endpoint. Flujo UX: formulario → confirmación con resumen → "Editar perfil".
+- Recomendaciones deterministas (biblioteca, catálogo, plataformas, horarios; sin IA opaca en v1). LFG con ponderación 50% juegos / 30% plataformas / 20% horarios y toggle "Looking to play".
+- DBML y SQL: todo en inglés, sin notas; los `checks` llevan nombre para que DBML y SQL coincidan.
+- Permisos: nadie lee tablas base; 8 vistas filtran por `app.current_user_id` (el backend debe hacer `SET LOCAL`). Evita exponer password_hash/email y filtra grupos privados sin RLS. Admin sí tiene acceso directo.
+- Integridad en BD: CHECKs + triggers `DEFERRABLE INITIALLY DEFERRED` para el rango 1–5 (permiten reemplazar la lista en una transacción) + FK compuesta `Post → CommunityVideogames` (RN-14). Autoría (RN-11/RN-18) queda en backend.
+- Tablas nuevas: `Report` (id polimórfico, sin FK), `Conversation` (participantes ordenados) y `Message` (trigger valida participantes y bloqueo, CU-35). Enums de reporte provisionales desde RC-01..05 y RF-97.
+- Timestamps migrados a `timestamptz` con `DEFAULT now()`; `updated_at` se actualiza por trigger.
 
 ## Aprendizajes y errores a evitar
+- PostgreSQL **no** admite `IF NOT EXISTS` en `CREATE ROLE`/`CREATE USER`; `roles.sql` usa un bloque `DO` sobre `pg_roles`.
+- `CREATE DATABASE` no puede ir dentro de una transacción ni de un bloque `DO`: se documenta como paso aparte en README.md.
+- GRANT/REVOKE sobre `ALL TABLES` solo afecta objetos existentes: `tables.sql` va antes que `permissions.sql`.
 - Commitear en cada tarea: el trabajo sin commit se pierde con cualquier reset.
-- Priorizar los docs numerados; los sueltos antiguos están duplicados.
-- Sin dependencias nuevas ni build steps sin aprobación explícita.
-- Código: comillas dobles, punto y coma, 2 espacios, llaves K&R, componentes PascalCase (eslint limpio, build OK).
+- Priorizar los docs numerados; los sueltos antiguos están duplicados. Sin dependencias ni build steps nuevos sin aprobación.
+- Enlaces internos de docs relativos al vault. Código: comillas dobles, punto y coma, 2 espacios, llaves K&R.
 
 ## Próximos pasos
-- Commitear ProfileForm (rama feature/, conventional commit).
-- Decidir con el equipo: ¿migrar apps/* a src-client/src-server? y documentar el formulario de perfil en los RF.
-- Conectar profileService al backend cuando exista el endpoint; migrar foto a MongoDB/Assets.
-- Completar 1.5.1 (pruebas), 1.5.3 (seguridad/aceptación) y crear 1.5.2.
+- Confirmar la resolución del conflicto de merge de este MEMORY.md y commitear.
+- Commitear ProfileForm y el esquema `database/` (ramas feature/, conventional commits).
+- Revisar si el DDL de 1.2.4/1.2.5 debe incorporarse a `database/`.
+- Ceñir privilegios de escritura por tabla/columna; añadir índices en columnas FK; decidir enums provisionales de reportes.
+- Integrar feat/gaming-survey si se aprueba; completar 1.5.1, 1.5.2 y 1.5.3.
+- Conectar profileService y los endpoints LFG al backend; migrar foto a MongoDB.
