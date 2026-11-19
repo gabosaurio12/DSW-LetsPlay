@@ -1,0 +1,202 @@
+Project lets_play {
+  database_type: 'PostgreSQL'
+}
+
+enum request_status {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum community_type {
+  PUBLIC
+  PRIVATE
+}
+
+enum community_role {
+  ADMIN
+  MEMBER
+}
+
+enum account_status {
+  ACTIVE
+  DELETED
+}
+
+enum post_status {
+  ACTIVE
+  DELETED
+}
+
+enum videogame_status {
+  ACTIVE
+  DISABLED
+}
+
+enum community_status {
+  ACTIVE
+  DELETED
+}
+
+enum gender {
+  UNDEFINED
+}
+
+Table User {
+  id_user uuid [pk]
+  username varchar(12) [unique, not null]
+  email varchar(255) [unique, not null]
+  birth_date date [not null]
+  gender gender [not null]
+  password_hash varchar(255) [not null]
+  display_name varchar(100)
+  description text
+  profile_photo_url varchar(500)
+  created_at timestamp [not null]
+  updated_at timestamp
+  account_status account_status [not null]
+}
+
+Table UserVideogames {
+  id_user uuid [pk]
+  id_videogame uuid [pk]
+  added_at timestamp [not null]
+}
+
+Table Follows {
+  id_follower uuid [pk]
+  id_followed uuid [pk]
+  followed_at timestamp [not null]
+}
+
+Table Blocks {
+  id_blocker uuid [pk]
+  id_blocked uuid [pk]
+  blocked_at timestamp [not null]
+}
+
+Table Mutes {
+  id_muter uuid [pk]
+  id_muted uuid [pk]
+  muted_at timestamp [not null]
+}
+
+Table Post {
+  id_post uuid [pk]
+  id_user uuid [not null]
+  id_videogame uuid [not null]
+  id_community uuid
+  content text
+  image_url varchar(500)
+  created_at timestamp [not null]
+  updated_at timestamp
+  status post_status [not null]
+}
+
+Table Comment {
+  id_comment uuid [pk]
+  id_post uuid [not null]
+  id_user uuid [not null]
+  content text [not null]
+  created_at timestamp [not null]
+}
+
+Table Reaction {
+  id_user uuid [pk]
+  id_post uuid [pk]
+  reacted_at timestamp [not null]
+}
+
+Table Videogames {
+  id_videogame uuid [pk]
+  name varchar(150) [unique, not null]
+  description text [not null]
+  genre varchar(100)
+  platform varchar(100)
+  cover_url varchar(500)
+  additional_info text
+  created_at timestamp [not null]
+  status videogame_status [not null]
+}
+
+Table VideogameRequests {
+  id_request uuid [pk]
+  id_requester uuid [not null]
+  name varchar(150) [not null]
+  description text [not null]
+  genre varchar(100)
+  platform varchar(100)
+  cover_url varchar(500)
+  additional_info text
+  status request_status [not null]
+  id_admin uuid
+  rejection_reason text
+  created_at timestamp [not null]
+  reviewed_at timestamp
+  id_approved_videogame uuid
+}
+
+Table Communities {
+  id_community uuid [pk]
+  id_creator uuid [not null]
+  name varchar(150) [not null]
+  description text [not null]
+  type community_type [not null]
+  image_url varchar(500)
+  rules text
+  created_at timestamp [not null]
+  updated_at timestamp
+  status community_status [not null]
+}
+
+Table CommunityVideogames {
+  id_community uuid [pk]
+  id_videogame uuid [pk]
+  associated_at timestamp [not null]
+}
+
+Table CommunityMembers {
+  id_community uuid [pk]
+  id_user uuid [pk]
+  role community_role [not null]
+  joined_at timestamp [not null]
+}
+
+Table CommunityJoinRequests {
+  id_request uuid [pk]
+  id_community uuid [not null]
+  id_user uuid [not null]
+  message text
+  status request_status [not null]
+  created_at timestamp [not null]
+  answered_at timestamp
+  id_admin uuid
+  admin_comment text
+}
+
+Ref: UserVideogames.id_user > User.id_user
+Ref: UserVideogames.id_videogame > Videogames.id_videogame
+Ref: Follows.id_follower > User.id_user
+Ref: Follows.id_followed > User.id_user
+Ref: Blocks.id_blocker > User.id_user
+Ref: Blocks.id_blocked > User.id_user
+Ref: Mutes.id_muter > User.id_user
+Ref: Mutes.id_muted > User.id_user
+Ref: Post.id_user > User.id_user
+Ref: Post.id_videogame > Videogames.id_videogame
+Ref: Post.id_community > Communities.id_community
+Ref: Comment.id_post > Post.id_post
+Ref: Comment.id_user > User.id_user
+Ref: Reaction.id_user > User.id_user
+Ref: Reaction.id_post > Post.id_post
+Ref: VideogameRequests.id_requester > User.id_user
+Ref: VideogameRequests.id_admin > User.id_user
+Ref: VideogameRequests.id_approved_videogame > Videogames.id_videogame
+Ref: Communities.id_creator > User.id_user
+Ref: CommunityVideogames.id_community > Communities.id_community
+Ref: CommunityVideogames.id_videogame > Videogames.id_videogame
+Ref: CommunityMembers.id_community > Communities.id_community
+Ref: CommunityMembers.id_user > User.id_user
+Ref: CommunityJoinRequests.id_community > Communities.id_community
+Ref: CommunityJoinRequests.id_user > User.id_user
+Ref: CommunityJoinRequests.id_admin > User.id_user
