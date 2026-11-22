@@ -2,14 +2,12 @@
 Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo que ya no aporte.
 
 ## Estado actual
-- Workspace en `main`; último commit `0bd6de7` (`feat: database scripts (not tested)`). `database/init-db.sh` nuevo sin commit ni push, según lo pedido.
-- Estructura definitiva: `apps/frontend` (React/Vite) y `apps/backend` (Express); `AGENTS.md` y `MEMORY.md` en raíz; `docs/` y `database/` canónicos.
-- Docs canónicos: 1.1.1, 1.1.2, 1.2.1..1.2.5, 1.3.1, 1.3.2. `1.5.1` sigue como plantilla; `1.5.3` incluye manejo de secretos. No existe `1.5.2`.
-- 1.2.4: publicaciones, comentarios, reacciones, encuestas y spoilers (RF-117..126, CU-39..45). 1.2.5: recomendaciones y búsqueda LFG (RF-127..136, CU-46..51, RN-27..30).
-- Feature activa en `main`: ProfileForm (RF-88/89). La documentación trata biblioteca y preferencias de juego (RF-127) por separado; no hay decisión de integración con WelcomeSurvey.
-- `feat/gaming-survey` divergió de `3420620`: una fusión directa borraría ProfileForm, `database/` y docs 1.2.4/1.2.5.
-- `database/` alineado con 1.2.4/1.2.5: 22 tablas, 14 enums, 42 FKs y 13 vistas. Ejecutado en cluster PostgreSQL 14 temporal: sintaxis, checks, unicidad y vistas OK.
-- `.opencode/` existe con comandos locales ignorados por git. `grill-me` solo está en la rama survey y no está instalado aquí.
+- Rama activa `Li0` (creada desde `main` con base en commit `8e9aa4c`). Todo el trabajo propio se aísla aquí para evitar conflictos.
+- Estructura: `apps/frontend` (React/Vite con ProfileForm e i18n) y `apps/backend` (Express base); `AGENTS.md` y `MEMORY.md` en raíz; `docs/` y `database/` canónicos.
+- Tareas Trello: 35 terminadas, 7 en V&V, 3 en proceso, 19 en pendientes. De pendientes (Li0 y Todos), las de modelado WAE (#30, #31, #35) y seguridad (#42) ya están cubiertas en docs y SQL.
+- Docs canónicos en `docs/`: 1.1.1, 1.1.2, 1.2.1..1.2.5, 1.3.1, 1.3.2, 1.5.1, 1.5.3 y complementarios.
+- `database/`: 22 tablas, 14 enums, 42 FKs, 13 vistas y roles en `roles.sql`/`permissions.sql`.
+- Pendientes inmediatos de Li0: #44/#47 (`README.md`, `.env.example`), #34 (modelo de presentación) y #48 (vistas auth en React).
 
 ## Decisiones (y por qué)
 - Stack: React + Express.js; PostgreSQL (relacional) + MongoDB (archivos/multimedia). Estructura `apps/*` definitiva.
