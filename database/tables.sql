@@ -35,7 +35,11 @@ CREATE TYPE "community_status" AS ENUM (
 );
 
 CREATE TYPE "gender" AS ENUM (
-  'UNDEFINED'
+  'UNDEFINED',
+  'MALE',
+  'FEMALE',
+  'NON_BINARY',
+  'OTHER'
 );
 
 CREATE TYPE "report_content_type" AS ENUM (
@@ -92,7 +96,7 @@ CREATE TABLE "User" (
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz,
   "account_status" account_status NOT NULL,
-  CONSTRAINT "chk_user_username_format" CHECK ("username" ~ '^[A-Za-z0-9]+$')
+  CONSTRAINT "chk_user_username_format" CHECK ("username" ~ '^[A-Za-z0-9_]+$')
 );
 
 CREATE TABLE "UserVideogames" (
@@ -114,6 +118,14 @@ CREATE TABLE "GamerPreference" (
   CONSTRAINT "chk_preference_genres_range" CHECK (jsonb_array_length("favorite_genres") BETWEEN 1 AND 5),
   CONSTRAINT "chk_preference_platforms_range" CHECK (jsonb_array_length("active_platforms") BETWEEN 1 AND 5),
   CONSTRAINT "chk_preference_availability_range" CHECK (jsonb_array_length("availability") >= 1)
+);
+
+CREATE TABLE "ActiveSessions" (
+  "token_hash" varchar(64) PRIMARY KEY,
+  "id_user" uuid NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  "expires_at" timestamptz NOT NULL,
+  CONSTRAINT "chk_session_expiry_after_creation" CHECK ("expires_at" > "created_at")
 );
 
 CREATE TABLE "Follows" (
@@ -432,6 +444,10 @@ ALTER TABLE "Message" ADD FOREIGN KEY ("id_sender") REFERENCES "User" ("id_user"
 ALTER TABLE "Message" ADD FOREIGN KEY ("id_recipient") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "GamerPreference" ADD FOREIGN KEY ("id_user") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "ActiveSessions" ADD FOREIGN KEY ("id_user") REFERENCES "User" ("id_user") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+CREATE INDEX "idx_active_sessions_id_user" ON "ActiveSessions" ("id_user");
 
 ALTER TABLE "Poll" ADD FOREIGN KEY ("id_post") REFERENCES "Post" ("id_post") DEFERRABLE INITIALLY IMMEDIATE;
 

@@ -173,10 +173,10 @@ function RegisterForm({ translate, onNavigate, onLoginSuccess }) {
                 <option value="" disabled>
                   {translate("auth.register.genderPlaceholder")}
                 </option>
-                <option value="male">{translate("auth.register.genderOptions.male")}</option>
-                <option value="female">{translate("auth.register.genderOptions.female")}</option>
-                <option value="nonBinary">{translate("auth.register.genderOptions.nonBinary")}</option>
-                <option value="other">{translate("auth.register.genderOptions.other")}</option>
+                <option value="MALE">{translate("auth.register.genderOptions.male")}</option>
+                <option value="FEMALE">{translate("auth.register.genderOptions.female")}</option>
+                <option value="NON_BINARY">{translate("auth.register.genderOptions.nonBinary")}</option>
+                <option value="OTHER">{translate("auth.register.genderOptions.other")}</option>
               </select>
             </div>
           </div>

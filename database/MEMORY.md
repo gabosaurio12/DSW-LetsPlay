@@ -3,7 +3,9 @@
 Memoria de PostgreSQL. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 
 ## Estado actual
-- Según la memoria anterior: 22 tablas, 14 enums, 42 FKs, 13 vistas y roles. Alineado con 1.2.4 y 1.2.5. Ejecutado correctamente en un cluster temporal. No re-verificado el 2026-11-27.
+- 23 tablas (2026-11-28): se añadió `ActiveSessions` (token_hash, id_user, created_at, expires_at) con FK a `User` e índice por usuario.
+- `gender` admite `UNDEFINED`, `MALE`, `FEMALE`, `NON_BINARY` y `OTHER` (2026-11-28). `username` admite letras, números y guion bajo.
+- Base recreada con `init-db.sh` el 2026-11-28 (se aceptó perder datos de prueba). Semilla: 20 usuarios.
 - `seed.sql` carga el catálogo `Videogames` de forma idempotente.
 - Las vistas `letsplay_guest` no incluyen `CommunityVideogames` ni `CommunityMembers`.
 
@@ -15,6 +17,7 @@ Memoria de PostgreSQL. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 línea
 - Ocho vistas filtran por `app.current_user_id`, que el backend fija con `SET LOCAL`.
 
 ## Errores a evitar
+- Las contraseñas de la semilla son placeholders, no bcrypt válido. Crear cuentas nuevas por el registro para probar.
 - `CREATE ROLE` no admite `IF NOT EXISTS`. Usa un bloque `DO`.
 - `CREATE DATABASE` va fuera de transacción.
 - `GRANT` y `REVOKE` solo afectan objetos existentes: `tables.sql` debe ir antes que `permissions.sql`.

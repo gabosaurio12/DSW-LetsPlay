@@ -3,24 +3,27 @@
 Memoria del servidor. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 
 ## Estado actual
-- Rutas: `commentsRouter`, `lfgRouter`, `reportsRouter`, `uploadsRouter`, `videogamesRouter`. Repositorios: `comment`, `lfg`, `report`, `videogame`.
-- `src/app.js` y `src/server.js` presentes (antes figuraban como pendientes de otra rama).
-- `npm test`: 89/89 en verde (2026-11-27). Requiere `npm install` previo: faltaba `pg` en `node_modules`.
-- No hay endpoints de perfil ni de encuesta: el frontend los guarda en localStorage.
-- Tests de `/uploads` validan el tipo de archivo por magic bytes.
-- Puertos de desarrollo: backend `:3001`, frontend `:5173`, PostgreSQL contenedor `letsplay` en `:5439`.
-- Postgres se usa con `letsplay_admin`, porque `permissions.sql` no expone aún `CommunityVideogames` ni `CommunityMembers` a `letsplay_guest`.
+- Auth real (fase 2, 2026-11-28, sin commit): `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/session`, `POST /api/auth/logout`. Archivos: `routes/authRouter.js`, `repositories/authRepository.js`, `auth/*` (hash, tokens, cookie, validación, limitador, middleware, política de moderación).
+- Preferencias por cuenta: `GET` y `PUT /api/me/gamer-preferences` con `routes/gamerPreferencesRouter.js` y `repositories/gamerPreferencesRepository.js`. Catálogo y mapeo en `gamerPreferenceCatalog.js`.
+- Moderación: `GET /api/reports`, `PATCH /api/reports/:id` y `POST /api/reports/:id/remove-content` exigen sesión y permiso. Hoy ninguna cuenta tiene permiso (401 sin sesión, 403 con sesión).
+- `npm test`: 123/123 en verde (2026-11-28). Pruebas nuevas: `authRouter.test.js`, `gamerPreferencesRouter.test.js`.
+- Dependencia nueva aprobada: `bcrypt` ^6.
 
 ## Decisiones (y por qué)
-- CommonJS (`require`, `module.exports`), verificado el 2026-11-27. No cambiar a ESM sin aprobación.
-- Imágenes y assets en MongoDB. PostgreSQL no guarda binarios.
-- Pruebas con `node:test`. El estándar v1.1 se adaptó a esto el 2026-11-27; no se añade Jest.
-- Errores del servidor con `console.error`. No se añade logger (decisión 2026-11-27).
+- Contraseñas con `bcrypt`, 12 rondas. Máximo 72 bytes UTF-8: bcrypt ignora el resto, así que se rechaza en lugar de truncar.
+- Sesión: token aleatorio de 32 bytes en cookie `letsplay_session` (`HttpOnly`, `SameSite=Lax`, `Secure` en producción, 7 días). Solo se guarda su SHA-256 en `ActiveSessions`.
+- Login con límite de 10 fallos por identificador en 15 minutos (en memoria). Cuentas inexistentes también pasan por bcrypt para no revelar cuáles existen.
+- Escrituras de `/api/auth` y `/api/me` rechazan el encabezado `Origin` distinto de `CORS_ORIGIN`.
+- Preferencias: los IDs de la encuesta se guardan como etiquetas de LFG (`GENRE_LABELS`, `PLATFORM_LABELS`, `AVAILABILITY_LABELS`). Si una lista no tiene ninguna etiqueta conocida, `GET` devuelve `null` y la encuesta se vuelve a mostrar.
+- Respuestas de error de auth: `{ errorKey }`. Resto de rutas: `{ error }`.
 
 ## Errores a evitar
-- No asumir que los tests pasan. Ejecuta `npm test` antes de dar un cambio por bueno.
-- No registrar `.env` en el repo; solo `.env.example`.
+- `.env` local con `PGUSER=letsplay_guest` no puede leer `User` ni `ActiveSessions`. Usar `letsplay_admin`, como indica `database/README.md`. No versionar la contraseña.
+- Ejecutar `npm test` tras cambios: la prueba de "Database connection lost" imprime un error a propósito.
+- Un servidor de `:3001` iniciado antes de los cambios sigue con código viejo: reiniciarlo.
 
 ## Próximos pasos
-- Migrar la foto de perfil a MongoDB; crear endpoints de perfil/encuesta si se decide dejar el localStorage.
-- Pendientes de docs: #44 y #47 (`README.md`, `.env.example`).
+- `POST /api/reports` aún toma `reporterId` del cuerpo; debe usar la sesión.
+- Alinear las etiquetas de horario de la encuesta con las de LFG (`Afternoons (16:00-19:00)` y similares) antes de producción.
+- Las cuentas de la semilla tienen un hash placeholder que no es bcrypt válido; no pueden iniciar sesión.
+- Migrar la foto de perfil a MongoDB.

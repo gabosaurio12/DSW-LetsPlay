@@ -9,6 +9,7 @@ import {
 import { loadProfile, saveProfile, mergeStoredProfile } from "./services/profileService.js";
 import { useTranslation } from "./hooks/useTranslation.js";
 import { ProfileField, VideogameGrid, ConfirmedProfilePanel } from "./components/ProfileFormPanels.jsx";
+import GamerPreferencesSection from "./components/GamerPreferencesSection.jsx";
 import "./ProfileForm.css";
 
 /**
@@ -39,9 +40,10 @@ function getProfileError(profile, translate) {
  *
  * @param {Object} props - The component props.
  * @param {string} props.language - The current application language code.
+ * @param {() => void} [props.onSessionExpired] - Called when the server reports that the session has expired.
  * @returns {JSX.Element} The rendered profile form.
  */
-function ProfileForm({ language }) {
+function ProfileForm({ language, onSessionExpired }) {
   const translate = useTranslation(language);
   const [profile, setProfile] = useState(createEmptyProfile);
   const [savedProfile, setSavedProfile] = useState(null);
@@ -119,6 +121,7 @@ function ProfileForm({ language }) {
           translate={translate}
           onEdit={handleEdit}
         />
+        <GamerPreferencesSection language={language} onSessionExpired={onSessionExpired} />
       </ProfileLayout>
     );
   }
@@ -180,6 +183,7 @@ function ProfileForm({ language }) {
           </button>
         </div>
       </section>
+      <GamerPreferencesSection language={language} onSessionExpired={onSessionExpired} />
     </ProfileLayout>
   );
 }

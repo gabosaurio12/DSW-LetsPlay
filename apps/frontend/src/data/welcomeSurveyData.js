@@ -4,17 +4,19 @@ const MAX_GENRE_SELECTIONS = 5;
 const MAX_PLATFORM_SELECTIONS = 5;
 
 /**
- * Catalogue of the welcome survey steps.
+ * Catalogue of the welcome survey questions, in display order.
  * Each option only stores its language-neutral id; labels live in the i18n
- * dictionaries under the step's optionsTranslationKey.
+ * dictionaries under the question's optionsTranslationKey. When exclusiveOptionId
+ * is set, that option cannot be combined with any other one of the same question.
  */
 export const WELCOME_SURVEY_STEPS = [
   {
     id: "genres",
-    translationKey: "survey.steps.genres",
+    titleTranslationKey: "survey.questions.genres",
     optionsTranslationKey: "survey.options.genres",
     minSelections: MIN_SELECTIONS,
     maxSelections: MAX_GENRE_SELECTIONS,
+    exclusiveOptionId: null,
     options: [
       { id: "rpg" },
       { id: "shooter" },
@@ -28,14 +30,15 @@ export const WELCOME_SURVEY_STEPS = [
   },
   {
     id: "platforms",
-    translationKey: "survey.steps.platforms",
+    titleTranslationKey: "survey.questions.platforms",
     optionsTranslationKey: "survey.options.platforms",
     minSelections: MIN_SELECTIONS,
     maxSelections: MAX_PLATFORM_SELECTIONS,
+    exclusiveOptionId: null,
     options: [
       { id: "pc" },
-      { id: "playstation" },
       { id: "xbox" },
+      { id: "playstation" },
       { id: "nintendoSwitch" },
       { id: "mobile" },
       { id: "vr" },
@@ -43,15 +46,18 @@ export const WELCOME_SURVEY_STEPS = [
   },
   {
     id: "availability",
-    translationKey: "survey.steps.availability",
+    titleTranslationKey: "survey.questions.availability",
     optionsTranslationKey: "survey.options.availability",
     minSelections: MIN_SELECTIONS,
     maxSelections: null,
+    exclusiveOptionId: "anyTime",
     options: [
+      { id: "weekdayMornings" },
+      { id: "weekdayAfternoons" },
       { id: "weekdayNights" },
       { id: "weekendMornings" },
+      { id: "weekendAfternoons" },
       { id: "weekendNights" },
-      { id: "weekdayAfternoons" },
       { id: "anyTime" },
     ],
   },

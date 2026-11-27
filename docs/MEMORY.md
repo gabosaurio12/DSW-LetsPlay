@@ -18,6 +18,6 @@ Memoria de la documentación. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50
 - No tratar `1.5.1` ni `1.5.3` como completados.
 
 ## Próximos pasos
-- Documentar la encuesta en RF/formularios (RF-127).
+- RF-127, RN-27 y CU-46 ya describen la persistencia por cuenta (2026-11-28). Falta reflejar sesiones y recuperación de contraseña en 1.2.* cuando se definan.
 - Completar `1.5.1` y crear `1.5.2`.
 - Ampliar `1.5.3`.

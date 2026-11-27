@@ -5,13 +5,16 @@ const { createCommentsRouter } = require("./routes/commentsRouter");
 const { createReportsRouter } = require("./routes/reportsRouter");
 const { createLfgRouter } = require("./routes/lfgRouter");
 const { createUploadsRouter } = require("./routes/uploadsRouter");
+const { createAuthRouter } = require("./routes/authRouter");
+const { createGamerPreferencesRouter } = require("./routes/gamerPreferencesRouter");
+const { createRequireModerator, createOriginGuard } = require("./auth/authMiddleware");
 
 /**
  * Resolves app dependencies while remaining retrocompatible with callers
  * that pass videogameRepository directly.
  *
- * @param {object} dependencies - Either { videogameRepository, commentRepository, reportRepository, lfgRepository, uploadDir } or videogameRepository.
- * @returns {{ videogameRepository: object, commentRepository?: object, reportRepository?: object, lfgRepository?: object, uploadDir?: string }} Resolved repositories.
+ * @param {object} dependencies - Either a repositories object or videogameRepository.
+ * @returns {object} Resolved repositories and optional middleware overrides.
  */
 function resolveRepositories(dependencies) {
     if (dependencies && typeof dependencies === "object" && "videogameRepository" in dependencies) {
@@ -20,6 +23,9 @@ function resolveRepositories(dependencies) {
             commentRepository: dependencies.commentRepository,
             reportRepository: dependencies.reportRepository,
             lfgRepository: dependencies.lfgRepository,
+            authRepository: dependencies.authRepository,
+            gamerPreferencesRepository: dependencies.gamerPreferencesRepository,
+            requireModerator: dependencies.requireModerator,
             uploadDir: dependencies.uploadDir
         };
     }
@@ -29,6 +35,9 @@ function resolveRepositories(dependencies) {
         commentRepository: undefined,
         reportRepository: undefined,
         lfgRepository: undefined,
+        authRepository: undefined,
+        gamerPreferencesRepository: undefined,
+        requireModerator: undefined,
         uploadDir: undefined
     };
 }
@@ -46,17 +55,21 @@ function createApp(dependencies) {
         commentRepository,
         reportRepository,
         lfgRepository,
+        authRepository,
+        gamerPreferencesRepository,
+        requireModerator,
         uploadDir
     } = resolveRepositories(dependencies);
     const resolvedUploadDir = uploadDir || path.join(__dirname, "../../uploads");
     const app = express();
     const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+    const secureCookies = process.env.NODE_ENV === "production";
 
     app.use(express.json());
 
     app.use((req, res, next) => {
         res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
         if (req.method === "OPTIONS") {
@@ -77,8 +90,19 @@ function createApp(dependencies) {
         app.use("/api/posts", createCommentsRouter(commentRepository));
     }
 
+    if (authRepository) {
+        const originGuard = createOriginGuard(allowedOrigin);
+        app.use("/api/auth", originGuard, createAuthRouter(authRepository, { secureCookies }));
+        app.use(
+            "/api/me/gamer-preferences",
+            originGuard,
+            createGamerPreferencesRouter(authRepository, gamerPreferencesRepository)
+        );
+    }
+
     if (reportRepository) {
-        app.use("/api/reports", createReportsRouter(reportRepository));
+        const resolvedRequireModerator = requireModerator || createRequireModerator(authRepository);
+        app.use("/api/reports", createReportsRouter(reportRepository, resolvedRequireModerator));
     }
 
     if (lfgRepository) {

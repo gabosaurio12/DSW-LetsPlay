@@ -3,9 +3,11 @@
 Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 
 ## Estado actual
-- Auth: `LoginForm`, `RegisterForm`, `RecoveryForm`, `AuthBrand` con `authService.js` (sesión en localStorage, seed `seth_play`). Logout en header y en `ProfileForm` (RF-88/89).
+- Auth (fase 2, 2026-11-28): `LoginForm`, `RegisterForm` y `AuthBrand` llaman a `/api/auth/*` con cookie de sesión. La sesión se consulta al arrancar (`fetchCurrentUser`). Recuperación de contraseña retirada hasta el flujo por correo.
+- Preferencias por cuenta: `welcomeSurveyService` usa `/api/me/gamer-preferences`. `WelcomeSurvey` sirve para bienvenida (`mode="onboarding"`) y edición (`mode="edit"`), y `components/GamerPreferencesSection` la abre desde `ProfileForm`.
+- Errores de la encuesta: `loadWelcomeSurvey` lanza error con `status`. 401 cierra sesión; otros fallos muestran reintento.
 - `App.jsx` (merge resuelto 2026-11-27): sin sesión → auth. Con sesión sin encuesta → `WelcomeSurvey`. Con encuesta completa → shell con `ExploreGames` por defecto. `/admin` también exige sesión y encuesta. Logout en el header del shell y del admin.
-- Encuesta: wizard géneros → plataformas → disponibilidad → resumen. Archivos: `welcomeSurveyData.js`, `welcomeSurveyService.js`, `WelcomeSurveyPanels`, `SurveyOptionChip`, `hooks/useTranslation`.
+- Encuesta: formulario único según Figma `128-926`, con `AuthBrand`, tarjeta de 490px y botón "Aceptar". Archivos: `welcomeSurveyData.js`, `welcomeSurveyService.js`, `WelcomeSurvey.jsx`, `WelcomeSurveyPanels` (`SurveyOptionGroup`), `SurveyOptionChip`.
 - Páginas: `ExploreGames`, `GameDetail` (drag & drop), `LfgSearch`, `ModerationPanel` (`/admin`).
 - Componentes nuevos: `PostComments`, `ReportModal`, `ProfileFormPanels`, `SelectableChip`.
 - `videogameService` (incluye uploads), `commentService`, `reportService` y `lfgService` consumen `/api/*` por el proxy de Vite a `:3001`. `authService`, `profileService` y `welcomeSurveyService` siguen en localStorage.
@@ -18,6 +20,11 @@ Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 - localStorage con async/await y try/catch. Ante fallo devuelve `null` o `false`.
 - 2026-11-27: `/admin` exige sesión y encuesta completa. Motivo: el panel de moderación no debe ser público.
 - 2026-11-27: tras autenticarse vista por defecto `ExploreGames`, no `ProfileForm`.
+- 2026-11-28: la encuesta pasó a formulario único (sin pasos ni resumen) según Figma `128-926`. Tercera pregunta: "¿A qué hora sueles jugar?". "Siempre estoy disponible" es excluyente. Se conservan los IDs guardados y se añadieron `weekdayMornings` y `weekendAfternoons`. Sigue en localStorage hasta la fase de persistencia por cuenta.
+- Pendiente de decisión: el blanco sobre `#bb8484` y el texto `#bb8484` sobre blanco tienen ~3.1:1 de contraste (no cumplen AA). Figma lo define así; hay que decidir si se ajusta. Las etiquetas de Figma "Indies", "Simulacion" y "XBOX" se escribieron como "Indie", "Simulación" y "Xbox".
+
+- 2026-11-28: la sesión vive en el servidor (cookie `HttpOnly`), no en localStorage. Las respuestas de la encuesta son por cuenta. Ya no se importan respuestas locales antiguas.
+- 2026-11-28: el registro envía los valores del enum de género (`MALE`, `FEMALE`, `NON_BINARY`, `OTHER`).
 
 ## Bugs abiertos (verificados en código el 2026-11-27)
 - Contraste: `ProfileForm.css` usa `--color-*` (tema oscuro de `index.css`), pero `App.css` fuerza fondo claro con `--lp-*`. Medido antes con DevTools: títulos 1.08 y chips 1.27. Lighthouse a11y 96. No re-medido.
@@ -27,5 +34,6 @@ Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 - En merges de i18n, el auto-merge de git dejó `profile` anidado dentro de `survey.errors` y un `}}};` final. Tras resolver, comprobar que `en.js` y `es.js` tengan las mismas claves (script de paridad) y no solo que el archivo compile.
 
 ## Próximos pasos
-- Conectar `welcomeSurveyService` y `profileService` al backend.
+- Conectar `profileService` (perfil, foto y biblioteca) al backend.
+- Revisar `ModerationPanel`: sus endpoints responden 401/403 hasta definir permisos.
 - Documentar la encuesta en RF y ajustar `ProfileForm` según esa decisión.
