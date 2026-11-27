@@ -34,6 +34,158 @@ export async function fetchUserProfile(userId, options = {}) {
 }
 
 /**
+ * Checks whether the signed-in account has blocked a profile.
+ *
+ * @param {string} userId - Account uuid.
+ * @param {{signal?: AbortSignal}} [options] - Optional fetch configuration.
+ * @returns {Promise<{isBlocked: boolean}>} Directed block state.
+ */
+export async function fetchBlockState(userId, options = {}) {
+    const response = await fetch(
+        `/api/users/${encodeURIComponent(userId)}/block-state`,
+        { signal: options.signal }
+    );
+    if (!response.ok) {
+        throw await toFollowError(response);
+    }
+    return response.json();
+}
+
+/**
+ * Loads the signed-in account's privacy setting.
+ *
+ * @param {{signal?: AbortSignal}} [options] - Optional fetch configuration.
+ * @returns {Promise<{isPrivate: boolean}>} Privacy setting.
+ */
+export async function fetchPrivacy(options = {}) {
+    const response = await fetch("/api/me/privacy", { signal: options.signal });
+    if (!response.ok) {
+        throw await toFollowError(response);
+    }
+    return response.json();
+}
+
+/**
+ * Updates the signed-in account's privacy setting.
+ *
+ * @param {boolean} isPrivate - Whether the account requires follow approval.
+ * @returns {Promise<{isPrivate: boolean}>} Saved setting.
+ */
+export async function updatePrivacy(isPrivate) {
+    const response = await fetch("/api/me/privacy", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPrivate })
+    });
+    if (!response.ok) {
+        throw await toFollowError(response);
+    }
+    return response.json();
+}
+
+/**
+ * Loads pending follow requests received by the signed-in account.
+ *
+ * @param {{limit?: number, offset?: number, signal?: AbortSignal}} [options] - Pagination options.
+ * @returns {Promise<{users: Array<Object>, total: number}>} Pending requests.
+ */
+export async function fetchFollowRequests(options = {}) {
+    const params = new URLSearchParams();
+    if (options.limit !== undefined) {
+        params.set("limit", String(options.limit));
+    }
+    if (options.offset !== undefined) {
+        params.set("offset", String(options.offset));
+    }
+    const query = params.toString();
+    const response = await fetch(`/api/users/me/follow-requests${query ? `?${query}` : ""}`, {
+        signal: options.signal
+    });
+    if (!response.ok) {
+        throw await toFollowError(response);
+    }
+    return response.json();
+}
+
+/**
+ * Accepts or rejects a pending follow request.
+ *
+ * @param {string} requesterId - Account that sent the request.
+ * @param {"accept"|"reject"} action - Decision.
+ * @returns {Promise<{action: string, resolved: boolean}>} Resolution result.
+ */
+export async function resolveFollowRequest(requesterId, action) {
+    const response = await fetch(
+        `/api/users/me/follow-requests/${encodeURIComponent(requesterId)}`,
+        {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action })
+        }
+    );
+    if (!response.ok) {
+        throw await toFollowError(response);
+    }
+    return response.json();
+}
+
+/**
+ * Loads accounts blocked by the signed-in account.
+ *
+ * @param {{limit?: number, offset?: number, signal?: AbortSignal}} [options] - Pagination options.
+ * @returns {Promise<{users: Array<Object>}>} Blocked accounts.
+ */
+export async function fetchBlockedUsers(options = {}) {
+    const params = new URLSearchParams();
+    if (options.limit !== undefined) {
+        params.set("limit", String(options.limit));
+    }
+    if (options.offset !== undefined) {
+        params.set("offset", String(options.offset));
+    }
+    const query = params.toString();
+    const response = await fetch(`/api/me/blocks${query ? `?${query}` : ""}`, {
+        signal: options.signal
+    });
+    if (!response.ok) {
+        throw await toFollowError(response);
+    }
+    return response.json();
+}
+
+/**
+ * Blocks another account.
+ *
+ * @param {string} userId - Account to block.
+ * @returns {Promise<{isBlocked: boolean}>} Updated block state.
+ */
+export async function blockUser(userId) {
+    const response = await fetch(`/api/users/${encodeURIComponent(userId)}/block`, {
+        method: "PUT"
+    });
+    if (!response.ok) {
+        throw await toFollowError(response);
+    }
+    return response.json();
+}
+
+/**
+ * Removes a block created by the signed-in account.
+ *
+ * @param {string} userId - Previously blocked account.
+ * @returns {Promise<{isBlocked: boolean}>} Updated block state.
+ */
+export async function unblockUser(userId) {
+    const response = await fetch(`/api/me/blocks/${encodeURIComponent(userId)}`, {
+        method: "DELETE"
+    });
+    if (!response.ok) {
+        throw await toFollowError(response);
+    }
+    return response.json();
+}
+
+/**
  * Creates a follow relationship from the signed-in account.
  *
  * @param {string} userId - Account uuid to follow.
@@ -107,12 +259,12 @@ export async function fetchFollowList(userId, listType, options = {}) {
  *
  * @param {Array<string>} userIds - Candidate account uuids.
  * @param {{signal?: AbortSignal}} [options] - Optional fetch configuration.
- * @returns {Promise<Set<string>>} Ids currently followed.
+ * @returns {Promise<{followedIds: Set<string>, pendingIds: Set<string>}>} Current states.
  */
 export async function fetchFollowedIds(userIds, options = {}) {
     const ids = userIds.filter((id) => typeof id === "string" && id !== "").slice(0, MAX_BATCH_IDS);
     if (ids.length === 0) {
-        return new Set();
+        return { followedIds: new Set(), pendingIds: new Set() };
     }
     const response = await fetch(`/api/users/follow-states?ids=${ids.join(",")}`, {
         signal: options.signal
@@ -121,7 +273,10 @@ export async function fetchFollowedIds(userIds, options = {}) {
         throw await toFollowError(response);
     }
     const data = await response.json();
-    return new Set(Array.isArray(data.followedIds) ? data.followedIds : []);
+    return {
+        followedIds: new Set(Array.isArray(data.followedIds) ? data.followedIds : []),
+        pendingIds: new Set(Array.isArray(data.pendingIds) ? data.pendingIds : [])
+    };
 }
 
 /**

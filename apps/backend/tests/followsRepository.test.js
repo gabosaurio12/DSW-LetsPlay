@@ -11,17 +11,59 @@ function createFakePool() {
         users: new Map(),
         blocks: [],
         follows: new Set(),
+        requests: new Set(),
         queries: []
     };
     const pool = {
         async query(sql, params) {
             state.queries.push({ sql, params });
+            if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql.trim())
+                || sql.includes('FOR UPDATE')) {
+                return { rows: [], rowCount: 0 };
+            }
+            if (sql.includes('SELECT "is_private" FROM "User"')) {
+                const user = state.users.get(params[0]);
+                const rows = user ? [{ is_private: Boolean(user.is_private) }] : [];
+                return { rows, rowCount: rows.length };
+            }
+            if (sql.trimStart().startsWith('SELECT 1 FROM "Blocks"')) {
+                const blocked = isBlocked(state, params[0], params[1]);
+                return { rows: blocked ? [{}] : [], rowCount: blocked ? 1 : 0 };
+            }
+            if (sql.includes('AS "pending"')) {
+                return {
+                    rows: [{
+                        following: state.follows.has(`${params[0]}|${params[1]}`),
+                        pending: state.requests.has(`${params[0]}|${params[1]}`)
+                    }]
+                };
+            }
+            if (sql.includes('INSERT INTO "FollowRequests"')) {
+                const key = `${params[0]}|${params[1]}`;
+                state.requests.add(key);
+                return { rows: [{ id_follower: params[0] }], rowCount: 1 };
+            }
+            if (sql.includes('DELETE FROM "FollowRequests"')) {
+                const key = `${params[0]}|${params[1]}`;
+                const deleted = state.requests.delete(key);
+                return { rows: [], rowCount: deleted ? 1 : 0 };
+            }
+            if (sql.includes("UPDATE \"User\" SET")) {
+                const user = state.users.get(params[0]);
+                if (user) {
+                    user.is_private = params[1];
+                }
+                return { rows: user ? [{ is_private: params[1] }] : [], rowCount: user ? 1 : 0 };
+            }
             if (sql.includes('AS "followers"')) {
                 return { rows: [stateCounts(state, params[0], params[1])] };
             }
             if (sql.includes("ANY($2::uuid[])")) {
+                const relationships = sql.includes('"FollowRequests"')
+                    ? state.requests
+                    : state.follows;
                 return { rows: params[1]
-                    .filter((id) => state.follows.has(`${params[0]}|${id}`))
+                    .filter((id) => relationships.has(`${params[0]}|${id}`))
                     .map((id) => ({ id_followed: id })) };
             }
             if (sql.includes("SELECT EXISTS")) {
@@ -43,6 +85,9 @@ function createFakePool() {
                 return { rows: listFollows(state, params, isFollowers) };
             }
             return { rows: findUsers(state, params), rowCount: 0 };
+        },
+        async connect() {
+            return { query: pool.query, release() {} };
         }
     };
     return { pool, state };
@@ -128,9 +173,9 @@ describe("followsRepository", () => {
 
     it("should reject self follows and duplicate relationships", async () => {
         const { repository } = seed();
-        assert.equal(await repository.addFollow(OTHER_ID, OTHER_ID), false);
-        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), true);
-        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), false);
+        assert.equal(await repository.addFollow(OTHER_ID, OTHER_ID), null);
+        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), "following");
+        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), "following");
     });
 
     it("should cast the insert parameters to uuid", async () => {
@@ -143,7 +188,7 @@ describe("followsRepository", () => {
     it("should reject follows between blocked accounts", async () => {
         const { repository, state } = seed();
         state.blocks.push({ blocker: OTHER_ID, blocked: VIEWER_ID });
-        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), false);
+        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), null);
     });
 
     it("should return only the batch ids followed by the viewer", async () => {
@@ -181,5 +226,13 @@ describe("followsRepository", () => {
         assert.equal(await repository.removeFollow(VIEWER_ID, OTHER_ID), true);
         assert.equal(state.follows.has(`${VIEWER_ID}|${OTHER_ID}`), false);
         assert.equal(state.follows.has(`${OTHER_ID}|${VIEWER_ID}`), true);
+    });
+
+    it("should create a pending request when the target account is private", async () => {
+        const { repository, state } = seed();
+        state.users.get(OTHER_ID).is_private = true;
+        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), "pending");
+        assert.equal(state.requests.has(`${VIEWER_ID}|${OTHER_ID}`), true);
+        assert.equal(state.follows.has(`${VIEWER_ID}|${OTHER_ID}`), false);
     });
 });

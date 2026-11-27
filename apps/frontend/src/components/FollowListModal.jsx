@@ -85,12 +85,10 @@ function FollowListModal({
                     onSessionExpired();
                     return;
                 }
-                setListState({
-                    key: requestKey,
-                    users: [],
-                    errorKey: "follows.errors.loadList",
-                    isLoading: false
-                });
+                const errorKey = error.status === 403 || error.status === 404
+                    ? "follows.states.unavailable"
+                    : "follows.errors.loadList";
+                setListState({ key: requestKey, users: [], errorKey, isLoading: false });
             });
 
         return () => {

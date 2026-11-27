@@ -501,6 +501,7 @@ function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} 
     const [reloadToken, setReloadToken] = useState(0);
 
     const [followedPlayerIds, setFollowedPlayerIds] = useState(() => new Set());
+    const [pendingPlayerIds, setPendingPlayerIds] = useState(() => new Set());
     const [busyFollowId, setBusyFollowId] = useState(null);
     const [feedbackBanner, setFeedbackBanner] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -563,10 +564,14 @@ function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} 
             .filter((id) => typeof id === "string" && UUID_REGEX.test(id));
 
         fetchFollowedIds(ids, { signal: controller.signal })
-            .then(setFollowedPlayerIds)
+            .then((states) => {
+                setFollowedPlayerIds(states.followedIds);
+                setPendingPlayerIds(states.pendingIds);
+            })
             .catch((err) => {
                 if (err.name !== "AbortError") {
                     setFollowedPlayerIds(new Set());
+                    setPendingPlayerIds(new Set());
                 }
             });
 
@@ -651,16 +656,25 @@ function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} 
             return;
         }
         const isFollowing = followedPlayerIds.has(playerId);
+        const isPending = pendingPlayerIds.has(playerId);
         setBusyFollowId(playerId);
         try {
-            if (isFollowing) {
+            if (isFollowing || isPending) {
                 await unfollowUser(playerId);
+                setPendingPlayerIds((previous) => {
+                    const next = new Set(previous);
+                    next.delete(playerId);
+                    return next;
+                });
             } else {
-                await followUser(playerId);
+                const result = await followUser(playerId);
+                if (result.connectionState === "pending") {
+                    setPendingPlayerIds((previous) => new Set([...previous, playerId]));
+                }
             }
             setFollowedPlayerIds((prev) => {
                 const next = new Set(prev);
-                if (isFollowing) {
+                if (isFollowing || isPending) {
                     next.delete(playerId);
                 } else {
                     next.add(playerId);
@@ -941,6 +955,13 @@ function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} 
                             ? Math.round(player.match_percentage)
                             : null;
                         const isFollowing = followedPlayerIds.has(playerId);
+                        const isPending = pendingPlayerIds.has(playerId);
+                        let followLabel = translate("lfg.playerCard.follow");
+                        if (isFollowing) {
+                            followLabel = translate("lfg.playerCard.following");
+                        } else if (isPending) {
+                            followLabel = translate("follows.requested");
+                        }
 
                         return (
                             <article key={playerId} className="lfg-card">
@@ -1015,13 +1036,11 @@ function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} 
                                     <button
                                         type="button"
                                         className={`lfg-btn-follow${isFollowing ? " lfg-btn-follow--active" : ""}`}
-                                        aria-pressed={isFollowing}
+                                        aria-pressed={isFollowing || isPending}
                                         disabled={busyFollowId === playerId}
                                         onClick={() => handleToggleFollow(playerId)}
                                     >
-                                        {isFollowing
-                                            ? translate("lfg.playerCard.following")
-                                            : translate("lfg.playerCard.follow")}
+                                        {followLabel}
                                     </button>
                                     <button
                                         type="button"
@@ -1077,7 +1096,17 @@ function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} 
                                     <div className="lfg-card-user">
                                         <PlayerAvatar avatarUrl={post.author_profile_photo_url} name={authorName} />
                                         <div className="lfg-user-meta">
-                                            <h2 className="lfg-user-name">{authorName}</h2>
+                                            <button
+                                                type="button"
+                                                className="lfg-user-name-button"
+                                                aria-label={translate(
+                                                    "follows.viewProfile",
+                                                    { name: authorName }
+                                                )}
+                                                onClick={() => handleOpenProfile(post.id_user)}
+                                            >
+                                                <h2 className="lfg-user-name">{authorName}</h2>
+                                            </button>
                                             <p className="lfg-user-subtitle">
                                                 {`${post.platform} · ${formatScheduleLabel(post.scheduled_time, translate)}`}
                                             </p>

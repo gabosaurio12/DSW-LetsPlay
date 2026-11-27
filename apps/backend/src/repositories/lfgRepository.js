@@ -31,6 +31,13 @@ WHERE u."account_status" = 'ACTIVE'
       WHERE (b."id_blocker" = $1 AND b."id_blocked" = u."id_user")
          OR (b."id_blocker" = u."id_user" AND b."id_blocked" = $1)
   )
+  AND (
+    NOT u."is_private"
+    OR EXISTS (
+      SELECT 1 FROM "Follows" f
+      WHERE f."id_follower" = $1 AND f."id_followed" = u."id_user"
+    )
+  )
 `;
 
 const FIND_CANDIDATES_GAMES_SQL = `
@@ -55,6 +62,13 @@ INNER JOIN "User" u ON u."id_user" = lp."id_user"
 INNER JOIN "v_public_videogame" vg ON vg."id_videogame" = lp."id_videogame"
 WHERE lp."status" = 'OPEN'
   AND u."account_status" = 'ACTIVE'
+  AND (
+    NOT u."is_private"
+    OR EXISTS (
+      SELECT 1 FROM "Follows" f
+      WHERE f."id_follower" = $1 AND f."id_followed" = u."id_user"
+    )
+  )
 `;
 
 const FIND_ACTIVE_VIDEOGAME_SQL = `
@@ -178,7 +192,7 @@ function calculateCompatibilityScore({
         gameScore = (sharedGamesCount / currentGameSet.size) * 50;
     }
 
-    if (gameScore === 0) {
+    if (gameScore === 0 && currentGameSet.size > 0) {
         return 0;
     }
 
@@ -333,7 +347,7 @@ function createLfgRepository(pool) {
             }
 
             const sharedGames = targetGames.filter((g) => currentGameIds.has(g.id_videogame.toLowerCase()));
-            if (sharedGames.length === 0) {
+            if (currentGames.length > 0 && sharedGames.length === 0) {
                 continue;
             }
 
@@ -392,12 +406,12 @@ function createLfgRepository(pool) {
     /**
      * Finds open LFG posts with author and videogame metadata.
      *
-     * @param {{ gameId?: string, platform?: string }} [filters] - Optional post filters.
+     * @param {{ gameId?: string, platform?: string, viewerId?: string }} [filters] - Optional filters.
      * @returns {Promise<Array<object>>} Open LFG posts ordered by newest first.
      */
     async function findOpenLfgPosts(filters = {}) {
         const conditions = [];
-        const params = [];
+        const params = [filters.viewerId || DEMO_USER_ID];
 
         if (filters.gameId) {
             params.push(filters.gameId);

@@ -3,8 +3,9 @@
 Memoria transversal entre sesiones. Máximo ~50 líneas. Memorias por carpeta: `apps/frontend/MEMORY.md`, `apps/backend/MEMORY.md`, `database/MEMORY.md`.
 
 ## Estado actual
-- Rama `feat/user-follows` con follows públicos sin commit (2026-11-27): backend + frontend + pruebas. No se hizo push. Falta decidir si se renombra a `feature/*` y quién commitea (ver discrepancia en Decisiones).
-- Fase 3 verificada: 146 pruebas de backend, lint y build de frontend, flujo real contra la base de desarrollo y paridad visual de nodos Figma `80:725` y `81:1051` inspeccionados, no auditados en pantalla implementada.
+- Rama `feat/user-follows`; follows públicos están en `bcc8e43`. Fase actual de privacidad y bloqueos sin commit ni push.
+- Fase privada en el árbol actual: backend + frontend + migración, 165 pruebas backend, lint/build frontend, 518 claves i18n iguales. Migración y flujo social validados en bases PostgreSQL temporales; la DB de desarrollo no se modificó.
+- Nodos Figma `78:989`, `80:725` y `81:1051` inspeccionados con Chrome DevTools. No se auditó visualmente la implementación en ejecución.
 - Rama `main` al día con `origin/main` (2026-11-27). PR #11 (AGENTS/MEMORY por carpeta) y PR #12 (LFG) fusionados.
 - Cambio sin commit el 2026-11-27: una línea nueva en `AGENTS.md` (Comentarios: priorizar no usar comentarios). Los commits los hace el usuario.
 - Tarea Trello #48 (registro, login y logout) completada en frontend.
@@ -21,7 +22,10 @@ Memoria transversal entre sesiones. Máximo ~50 líneas. Memorias por carpeta: `
 - IDs canónicos RF-01…RF-136, CU-01…CU-51, RN-01…RN-30. Actores: Visitante, Usuario, Moderador, Administrador.
 - Recomendaciones deterministas. LFG: 50% juegos, 30% plataformas, 20% horarios, más un toggle "Looking to play".
 - Sin dependencias nuevas ni pasos de build sin aprobación explícita.
-- 2026-11-27: los follows públicos son una entrega parcial de CU-26. La aprobación, las listas restringidas y la limpieza al bloquear quedan para la siguiente iteración (anotado en las memorias de apps y docs).
+- 2026-11-27: cuentas públicas por defecto para conservar visibilidad histórica. `Follows` guarda relaciones aceptadas; `FollowRequests`, pendientes. Rechazar permite solicitar de nuevo. Hacer pública una cuenta no aprueba solicitudes pendientes.
+- 2026-11-27: bloquear elimina follows y solicitudes en ambos sentidos dentro de una transacción; operaciones del mismo par bloquean ambas filas `User` en orden. Desbloquear no restaura relaciones.
+- 2026-11-27: CU-31/32 (silenciar) quedan fuera. La fase cubre privacidad, CU-29/30 y solicitudes ligadas al seguimiento. No se añadieron notificaciones ni cambios al feed.
+- 2026-11-27: LFG no debe exigir juegos compartidos cuando la cuenta aún no tiene biblioteca; mostrar afinidad por plataforma/horario hasta que agregue juegos. Autores de convocatorias LFG navegan a su perfil.
 - Discrepancia sin resolver: la rama usa `feat/*` y `AGENTS.md` indica `feature/*`; `AGENTS.md` pide commitear cada tarea y esta memoria dice que el usuario commitea. No renombrar ni commitear sin confirmación.
 
 ## Errores a evitar

@@ -1,4 +1,5 @@
 const express = require("express");
+const { createRequireSession } = require("../auth/authMiddleware");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_PLAY_STYLES = new Set(["CASUAL", "COMPETITIVE", "COOPERATIVE", "INDIFFERENT"]);
@@ -19,10 +20,12 @@ const TIME_SCHEDULE_REGEX = /^(?:[01]\d|2[0-3]):[0-5]\d(?:\s*-\s*(?:[01]\d|2[0-3
  * }} lfgRepository - LFG repository instance.
  * @returns {import("express").Router} Configured Express router.
  */
-function createLfgRouter(lfgRepository) {
+function createLfgRouter(lfgRepository, authRepository) {
     const router = express.Router();
+    const requireSession = authRepository ? createRequireSession(authRepository) : null;
 
-    router.get("/players", async (req, res) => {
+    const findPlayers = async (req, res, next) => {
+      try {
         const { userId, gameId, platform, availability, style, onlyAvailable } = req.query;
 
         if (userId !== undefined && userId !== "" && (typeof userId !== "string" || !UUID_REGEX.test(userId))) {
@@ -45,7 +48,7 @@ function createLfgRouter(lfgRepository) {
         }
 
         const result = await lfgRepository.findCompatiblePlayers({
-            userId: userId || undefined,
+            userId: req.currentUser?.id_user || userId || undefined,
             gameId: gameId || undefined,
             platform: typeof platform === "string" && platform.trim() ? platform.trim() : undefined,
             availability: typeof availability === "string" && availability.trim() ? availability.trim() : undefined,
@@ -54,9 +57,19 @@ function createLfgRouter(lfgRepository) {
         });
 
         res.status(200).json(result);
-    });
+      } catch (error) {
+        next(error);
+      }
+    };
 
-    router.get("/posts", async (req, res) => {
+    if (requireSession) {
+        router.get("/players", requireSession, findPlayers);
+    } else {
+        router.get("/players", findPlayers);
+    }
+
+    const findPosts = async (req, res, next) => {
+      try {
         const { gameId, platform } = req.query;
 
         if (gameId !== undefined && gameId !== "" && (typeof gameId !== "string" || !UUID_REGEX.test(gameId))) {
@@ -65,12 +78,22 @@ function createLfgRouter(lfgRepository) {
         }
 
         const posts = await lfgRepository.findOpenLfgPosts({
+            ...(req.currentUser ? { viewerId: req.currentUser.id_user } : {}),
             gameId: gameId || undefined,
             platform: typeof platform === "string" && platform.trim() ? platform.trim() : undefined
         });
 
         res.status(200).json({ posts });
-    });
+      } catch (error) {
+        next(error);
+      }
+    };
+
+    if (requireSession) {
+        router.get("/posts", requireSession, findPosts);
+    } else {
+        router.get("/posts", findPosts);
+    }
 
     router.post("/posts", async (req, res) => {
         const {

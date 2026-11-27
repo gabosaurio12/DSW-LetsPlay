@@ -11,6 +11,7 @@ import { useTranslation } from "./hooks/useTranslation.js";
 import { ProfileField, VideogameGrid, ConfirmedProfilePanel } from "./components/ProfileFormPanels.jsx";
 import GamerPreferencesSection from "./components/GamerPreferencesSection.jsx";
 import FollowListModal from "./components/FollowListModal.jsx";
+import AccountPrivacySection from "./components/AccountPrivacySection.jsx";
 import { fetchUserProfile } from "./services/followService.js";
 import "./ProfileForm.css";
 
@@ -148,6 +149,15 @@ function ProfileForm({ language, currentUserId, onOpenUserProfile, onSessionExpi
           onEdit={handleEdit}
         />
         <GamerPreferencesSection language={language} onSessionExpired={onSessionExpired} />
+        <AccountPrivacySection
+          translate={translate}
+          onSessionExpired={onSessionExpired}
+          onOpenUserProfile={onOpenUserProfile}
+          onRequestAccepted={() => setConnections((previous) => ({
+            ...previous,
+            followers: previous.followers + 1
+          }))}
+        />
       </ProfileLayout>
     );
   }
@@ -222,6 +232,15 @@ function ProfileForm({ language, currentUserId, onOpenUserProfile, onSessionExpi
         </button>
       </div>
       <GamerPreferencesSection language={language} onSessionExpired={onSessionExpired} />
+      <AccountPrivacySection
+        translate={translate}
+        onSessionExpired={onSessionExpired}
+        onOpenUserProfile={onOpenUserProfile}
+        onRequestAccepted={() => setConnections((previous) => ({
+          ...previous,
+          followers: previous.followers + 1
+        }))}
+      />
       {openConnectionList !== null && (
         <FollowListModal
           userId={currentUserId}

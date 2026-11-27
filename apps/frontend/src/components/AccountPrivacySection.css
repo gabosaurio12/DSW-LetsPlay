@@ -1,0 +1,133 @@
+.privacy-settings {
+    display: grid;
+    gap: 16px;
+    margin-top: 20px;
+    font-family: var(--lp-font-body);
+}
+
+.privacy-settings-title {
+    margin: 0;
+    color: var(--lp-text-primary);
+    font-family: var(--lp-font-display);
+    font-size: 20px;
+}
+
+.privacy-settings-section {
+    padding: 18px;
+    border: 1px solid var(--lp-border);
+    border-radius: 16px;
+    background: var(--lp-surface);
+}
+
+.privacy-settings-section h3 {
+    margin: 0 0 8px;
+    color: var(--lp-text-primary);
+    font-family: var(--lp-font-display);
+    font-size: 15px;
+}
+
+.privacy-settings-section p {
+    margin: 0 0 12px;
+    color: var(--lp-text-secondary);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.privacy-action {
+    padding: 8px 15px;
+    border: 1px solid var(--lp-border);
+    border-radius: 999px;
+    background: var(--lp-primary);
+    color: var(--lp-surface);
+    cursor: pointer;
+    font-family: var(--lp-font-display);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.privacy-action:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.privacy-action--secondary {
+    background: var(--lp-surface);
+    color: var(--lp-primary);
+}
+
+.privacy-account-list {
+    display: grid;
+}
+
+.privacy-account-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--lp-border);
+}
+
+.privacy-account-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--lp-text-primary);
+    cursor: pointer;
+    text-align: left;
+}
+
+.privacy-account-identity > span:last-child {
+    display: grid;
+    gap: 2px;
+}
+
+.privacy-account-identity small {
+    color: var(--lp-text-secondary);
+}
+
+.privacy-account-avatar {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--lp-primary-tint);
+    color: var(--lp-primary);
+    font-family: var(--lp-font-display);
+    font-weight: 700;
+}
+
+.privacy-account-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.privacy-unblock-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    color: var(--lp-text-secondary);
+    font-size: 12px;
+}
+
+.privacy-state,
+.privacy-error {
+    color: var(--lp-text-secondary);
+}
+
+.privacy-error {
+    margin: 0;
+}
+
+@media (max-width: 560px) {
+    .privacy-account-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

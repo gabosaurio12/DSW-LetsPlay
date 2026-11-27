@@ -641,7 +641,7 @@ describe("videogameRepository", () => {
         assert.match(calls[0].sql, /p\."status" = 'ACTIVE'/);
         assert.match(calls[0].sql, /u\."account_status" = 'ACTIVE'/);
         assert.match(calls[0].sql, /ORDER BY p\."created_at" DESC/);
-        assert.deepEqual(calls[0].params, [SAMPLE_ID]);
+        assert.deepEqual(calls[0].params, [SAMPLE_ID, undefined]);
     });
 
     it("queries comments by post id for active users and posts", async () => {
@@ -673,7 +673,7 @@ describe("videogameRepository", () => {
         assert.match(calls[0].sql, /u\."account_status" = 'ACTIVE'/);
         assert.match(calls[0].sql, /p\."status" = 'ACTIVE'/);
         assert.match(calls[0].sql, /ORDER BY cm\."created_at" ASC/);
-        assert.deepEqual(calls[0].params, [SAMPLE_ID]);
+        assert.deepEqual(calls[0].params, [SAMPLE_ID, undefined]);
     });
 
     it("createPublicPostForVideogame returns null when videogame is not found", async () => {

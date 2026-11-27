@@ -42,10 +42,11 @@ function createMockCommentRepository(overrides = {}) {
     };
 }
 
-async function withServer(commentRepository, callback) {
+async function withServer(commentRepository, callback, authRepository) {
     const app = createApp({
         videogameRepository: createMockVideogameRepository(),
-        commentRepository
+        commentRepository,
+        authRepository
     });
     const server = await new Promise((resolve) => {
         const instance = app.listen(0, "127.0.0.1", () => resolve(instance));
@@ -64,6 +65,46 @@ async function withServer(commentRepository, callback) {
 }
 
 describe("commentsRouter", () => {
+    it("should require a session when reading comments in the authenticated app", async () => {
+        await withServer(createMockCommentRepository(), async (baseUrl) => {
+            const response = await fetch(`${baseUrl}/api/posts/${SAMPLE_POST_ID}/comments`);
+            assert.equal(response.status, 401);
+        }, {
+            async findActiveSessionUser() {
+                return null;
+            }
+        });
+    });
+
+    it("should use the session account when creating a comment", async () => {
+        let submittedComment;
+        await withServer(createMockCommentRepository({
+            async createComment(payload) {
+                submittedComment = payload;
+                return { id_comment: SAMPLE_POST_ID };
+            }
+        }), async (baseUrl) => {
+            const response = await fetch(`${baseUrl}/api/posts/${SAMPLE_POST_ID}/comments`, {
+                method: "POST",
+                headers: {
+                    Cookie: "letsplay_session=valid-token",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    content: "A comment",
+                    userId: SAMPLE_USER_ID
+                })
+            });
+            assert.equal(response.status, 201);
+            assert.equal(submittedComment.userId, undefined);
+            assert.equal(submittedComment.viewerId, SAMPLE_USER_ID);
+        }, {
+            async findActiveSessionUser() {
+                return { id_user: SAMPLE_USER_ID };
+            }
+        });
+    });
+
     it("GET /api/posts/:postId/comments returns 400 for invalid UUID", async () => {
         await withServer(createMockCommentRepository(), async (baseUrl) => {
             const response = await fetch(`${baseUrl}/api/posts/not-a-uuid/comments`);
@@ -251,7 +292,7 @@ describe("commentRepository", () => {
         assert.match(calls[0].sql, /u\."account_status" = 'ACTIVE'/);
         assert.match(calls[0].sql, /p\."status" = 'ACTIVE'/);
         assert.match(calls[0].sql, /ORDER BY cm\."created_at" ASC/);
-        assert.deepEqual(calls[0].params, [SAMPLE_POST_ID]);
+        assert.deepEqual(calls[0].params, [SAMPLE_POST_ID, undefined]);
     });
 
     it("createComment returns null when active post is not found", async () => {
@@ -273,7 +314,7 @@ describe("commentRepository", () => {
         assert.equal(calls.length, 1);
         assert.match(calls[0].sql, /FROM "Post" p/);
         assert.match(calls[0].sql, /p\."status" = 'ACTIVE'/);
-        assert.deepEqual(calls[0].params, [SAMPLE_POST_ID]);
+        assert.deepEqual(calls[0].params, [SAMPLE_POST_ID, DEMO_USER_ID]);
     });
 
     it("createComment inserts with generated UUID and demo user when userId is omitted", async () => {
