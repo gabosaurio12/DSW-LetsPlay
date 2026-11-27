@@ -8,17 +8,24 @@
 | `tables.sql` | Enums, tablas, claves foráneas, checks y triggers. |
 | `roles.sql` | Roles de permisos y usuarios de demostración. |
 | `permissions.sql` | Vistas de lectura y concesión de privilegios. |
+| `seed.sql` | Datos iniciales idempotentes del catálogo de videojuegos (`Videogames`). |
 
 ## Orden de ejecución
 
-Los scripts no son idempotentes (salvo `roles.sql`): crear la base de datos y ejecutarlos **una sola vez** sobre una BD vacía.
+Los scripts de esquema no son idempotentes (salvo `roles.sql` y `seed.sql`): crear la base de datos y ejecutarlos **una sola vez** sobre una BD vacía.
 
 ```sh
 psql -U postgres -d postgres -f database/roles.sql
 psql -U postgres -d postgres -c 'CREATE DATABASE letsplay;'
 psql -U postgres -d letsplay -f database/tables.sql
 psql -U postgres -d letsplay -f database/permissions.sql
+psql -U postgres -d letsplay -f database/seed.sql
 ```
+
+Para desarrollo local con Docker:
+
+- `bash database/init-db.sh`: instalación completa desde cero. Crea o inicia el contenedor `letsplay` exponiendo PostgreSQL únicamente en `127.0.0.1:5432` (acepta `LETSPLAY_DB_PORT=5439 bash database/init-db.sh` si el puerto `5432` está ocupado), recrea la base de datos `letsplay` y aplica `roles.sql`, `tables.sql`, `permissions.sql` y `seed.sql` en ese orden.
+- `bash database/seed-db.sh`: solo poblar o actualizar los datos idempotentes con `seed.sql` sin borrar ni recrear la base de datos (si el contenedor está detenido, lo inicia con `database/start-db.sh`, y al finalizar imprime un resumen de conteos).
 
 `CREATE DATABASE` no puede ejecutarse dentro de una transacción, por eso vive fuera de los scripts y requiere conexión previa a `postgres`. PostgreSQL no admite `IF NOT EXISTS` en `CREATE ROLE`/`CREATE USER`, así que `roles.sql` usa un bloque `DO` que consulta `pg_roles` y puede repetirse sin error.
 
