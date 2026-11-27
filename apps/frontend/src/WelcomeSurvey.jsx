@@ -49,9 +49,10 @@ function removeOption(selection, optionId) {
  *
  * @param {Object} props - The component props.
  * @param {string} props.language - The current application language code.
+ * @param {() => void} [props.onCompleted] - Called right after the answers are saved successfully.
  * @returns {JSX.Element} The rendered survey.
  */
-function WelcomeSurvey({ language }) {
+function WelcomeSurvey({ language, onCompleted }) {
   const translate = useTranslation(language);
   const [selection, setSelection] = useState(createEmptySelection);
   const [savedResponse, setSavedResponse] = useState(null);
@@ -126,6 +127,7 @@ function WelcomeSurvey({ language }) {
     }
     setSavedResponse(selection);
     setIsEditing(false);
+    onCompleted?.();
   };
 
   const handleEdit = () => {
