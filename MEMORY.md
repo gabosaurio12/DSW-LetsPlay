@@ -7,6 +7,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Estructura definitiva: `apps/frontend` (React/Vite) y `apps/backend` (Express); `AGENTS.md` y `MEMORY.md` en raíz; `docs/` y `database/` canónicos.
 - Docs canónicos: 1.1.1, 1.1.2, 1.2.1..1.2.5, 1.3.1, 1.3.2. `1.5.1` sigue como plantilla; `1.5.3` incluye manejo de secretos. No existe `1.5.2`.
 - 1.2.4: publicaciones, comentarios, reacciones, encuestas y spoilers (RF-117..126, CU-39..45). 1.2.5: recomendaciones y búsqueda LFG (RF-127..136, CU-46..51, RN-27..30).
+- 1.2.3: tabla "Resumen de trazabilidad" completada con CU-01..CU-38; RF de CU-01..19 tomados de 1.2.1 y RF-98..116 del propio documento. CU-39..51 siguen en 1.2.4/1.2.5.
 - Feature activa en `main`: ProfileForm (RF-88/89). La documentación trata biblioteca y preferencias de juego (RF-127) por separado; no hay decisión de integración con WelcomeSurvey.
 - `feat/gaming-survey` divergió de `3420620`: una fusión directa borraría ProfileForm, `database/` y docs 1.2.4/1.2.5.
 - `database/` alineado con 1.2.4/1.2.5: 22 tablas, 14 enums, 42 FKs y 13 vistas. Ejecutado en cluster PostgreSQL 14 temporal: sintaxis, checks, unicidad y vistas OK.
@@ -16,6 +17,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 ## Decisiones (y por qué)
 - Stack: React + Express.js; PostgreSQL (relacional) + MongoDB (archivos/multimedia). Estructura `apps/*` definitiva.
 - IDs canónicos: RF-01..RF-136, CU-01..CU-51, RN-01..RN-30; actores Visitante, Usuario, Moderador, Administrador.
+- La tabla de trazabilidad de 1.2.3 cubre solo los CU documentados ahí (01..38), confirmado por el usuario; no importar CU-39..51 desde 1.2.4/1.2.5.
 - i18n: mini-diccionario propio es/en sin dependencias. Persistencia temporal en localStorage ("letsPlay.userProfile") con validación y degradación a null.
 - Recomendaciones deterministas (biblioteca, catálogo, plataformas, horarios). LFG: 50% juegos / 30% plataformas / 20% horarios y toggle "Looking to play".
 - DBML y SQL en inglés, sin notas; los checks llevan nombre para que DBML y SQL coincidan.
