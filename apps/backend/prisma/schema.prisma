@@ -1,0 +1,475 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model ActiveSessions {
+  token_hash String   @id @db.VarChar(64)
+  id_user    String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  expires_at DateTime @db.Timestamptz(6)
+  User       User     @relation(fields: [id_user], references: [id_user], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_user], map: "idx_active_sessions_id_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Blocks {
+  id_blocker                   String   @db.Uuid
+  id_blocked                   String   @db.Uuid
+  blocked_at                   DateTime @default(now()) @db.Timestamptz(6)
+  User_Blocks_id_blockedToUser User     @relation("Blocks_id_blockedToUser", fields: [id_blocked], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  User_Blocks_id_blockerToUser User     @relation("Blocks_id_blockerToUser", fields: [id_blocker], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([id_blocker, id_blocked])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Comment {
+  id_comment String   @id @db.Uuid
+  id_post    String   @db.Uuid
+  id_user    String   @db.Uuid
+  content    String
+  is_spoiler Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  Post       Post     @relation(fields: [id_post], references: [id_post], onDelete: NoAction, onUpdate: NoAction)
+  User       User     @relation(fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Communities {
+  id_community          String                  @id @db.Uuid
+  id_creator            String                  @db.Uuid
+  name                  String                  @db.VarChar(150)
+  description           String
+  type                  community_type
+  image_url             String?                 @db.VarChar(500)
+  rules                 String?
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?               @db.Timestamptz(6)
+  status                community_status
+  User                  User                    @relation(fields: [id_creator], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  CommunityJoinRequests CommunityJoinRequests[]
+  CommunityMembers      CommunityMembers[]
+  CommunityVideogames   CommunityVideogames[]
+  Post                  Post[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model CommunityJoinRequests {
+  id_request                                String         @id @db.Uuid
+  id_community                              String         @db.Uuid
+  id_user                                   String         @db.Uuid
+  message                                   String?
+  status                                    request_status
+  created_at                                DateTime       @default(now()) @db.Timestamptz(6)
+  answered_at                               DateTime?      @db.Timestamptz(6)
+  id_admin                                  String?        @db.Uuid
+  admin_comment                             String?
+  User_CommunityJoinRequests_id_adminToUser User?          @relation("CommunityJoinRequests_id_adminToUser", fields: [id_admin], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  Communities                               Communities    @relation(fields: [id_community], references: [id_community], onDelete: NoAction, onUpdate: NoAction)
+  User_CommunityJoinRequests_id_userToUser  User           @relation("CommunityJoinRequests_id_userToUser", fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model CommunityMembers {
+  id_community String         @db.Uuid
+  id_user      String         @db.Uuid
+  role         community_role
+  joined_at    DateTime       @default(now()) @db.Timestamptz(6)
+  Communities  Communities    @relation(fields: [id_community], references: [id_community], onDelete: NoAction, onUpdate: NoAction)
+  User         User           @relation(fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([id_community, id_user])
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model CommunityVideogames {
+  id_community  String      @db.Uuid
+  id_videogame  String      @db.Uuid
+  associated_at DateTime    @default(now()) @db.Timestamptz(6)
+  Communities   Communities @relation(fields: [id_community], references: [id_community], onDelete: NoAction, onUpdate: NoAction)
+  Videogames    Videogames  @relation(fields: [id_videogame], references: [id_videogame], onDelete: NoAction, onUpdate: NoAction)
+  Post          Post[]
+
+  @@id([id_community, id_videogame])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Conversation {
+  id_conversation                   String    @id @db.Uuid
+  id_user_1                         String    @db.Uuid
+  id_user_2                         String    @db.Uuid
+  created_at                        DateTime  @default(now()) @db.Timestamptz(6)
+  User_Conversation_id_user_1ToUser User      @relation("Conversation_id_user_1ToUser", fields: [id_user_1], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  User_Conversation_id_user_2ToUser User      @relation("Conversation_id_user_2ToUser", fields: [id_user_2], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  Message                           Message[]
+
+  @@unique([id_user_1, id_user_2], map: "uq_conversation_users")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model FollowRequests {
+  id_follower                           String   @db.Uuid
+  id_followed                           String   @db.Uuid
+  requested_at                          DateTime @default(now()) @db.Timestamptz(6)
+  User_FollowRequests_id_followedToUser User     @relation("FollowRequests_id_followedToUser", fields: [id_followed], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  User_FollowRequests_id_followerToUser User     @relation("FollowRequests_id_followerToUser", fields: [id_follower], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([id_follower, id_followed])
+  @@index([id_followed, requested_at], map: "idx_follow_requests_followed_requested_at")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Follows {
+  id_follower                    String   @db.Uuid
+  id_followed                    String   @db.Uuid
+  followed_at                    DateTime @default(now()) @db.Timestamptz(6)
+  User_Follows_id_followedToUser User     @relation("Follows_id_followedToUser", fields: [id_followed], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  User_Follows_id_followerToUser User     @relation("Follows_id_followerToUser", fields: [id_follower], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([id_follower, id_followed])
+  @@index([id_followed], map: "idx_follows_id_followed")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model GamerPreference {
+  id_preference    String     @id @db.Uuid
+  id_user          String     @unique @db.Uuid
+  favorite_genres  Json
+  active_platforms Json
+  availability     Json
+  preferred_style  play_style @default(INDIFFERENT)
+  looking_to_play  Boolean    @default(true)
+  updated_at       DateTime   @default(now()) @db.Timestamptz(6)
+  User             User       @relation(fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model LfgPost {
+  id_lfg            String          @id @db.Uuid
+  id_user           String          @db.Uuid
+  id_videogame      String          @db.Uuid
+  platform          String          @db.VarChar(50)
+  spots_available   Int
+  scheduled_time    String          @db.VarChar(100)
+  description       String
+  accepts_beginners Boolean         @default(true)
+  status            lfg_post_status
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+  User              User            @relation(fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  Videogames        Videogames      @relation(fields: [id_videogame], references: [id_videogame], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Message {
+  id_message                      String       @id @db.Uuid
+  id_conversation                 String       @db.Uuid
+  id_sender                       String       @db.Uuid
+  id_recipient                    String       @db.Uuid
+  content                         String
+  sent_at                         DateTime     @default(now()) @db.Timestamptz(6)
+  Conversation                    Conversation @relation(fields: [id_conversation], references: [id_conversation], onDelete: NoAction, onUpdate: NoAction)
+  User_Message_id_recipientToUser User         @relation("Message_id_recipientToUser", fields: [id_recipient], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  User_Message_id_senderToUser    User         @relation("Message_id_senderToUser", fields: [id_sender], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Mutes {
+  id_muter                  String   @db.Uuid
+  id_muted                  String   @db.Uuid
+  muted_at                  DateTime @default(now()) @db.Timestamptz(6)
+  User_Mutes_id_mutedToUser User     @relation("Mutes_id_mutedToUser", fields: [id_muted], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  User_Mutes_id_muterToUser User     @relation("Mutes_id_muterToUser", fields: [id_muter], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([id_muter, id_muted])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Poll {
+  id_poll    String       @id @db.Uuid
+  id_post    String       @unique @db.Uuid
+  question   String       @db.VarChar(250)
+  closes_at  DateTime?    @db.Timestamptz(6)
+  status     poll_status
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  Post       Post         @relation(fields: [id_post], references: [id_post], onDelete: NoAction, onUpdate: NoAction)
+  PollOption PollOption[]
+  PollVote   PollVote[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model PollOption {
+  id_option String     @id @db.Uuid
+  id_poll   String     @db.Uuid
+  text      String     @db.VarChar(100)
+  position  Int
+  Poll      Poll       @relation(fields: [id_poll], references: [id_poll], onDelete: NoAction, onUpdate: NoAction)
+  PollVote  PollVote[]
+
+  @@unique([id_poll, position], map: "uq_poll_option_position")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model PollVote {
+  id_vote    String     @id @db.Uuid
+  id_poll    String     @db.Uuid
+  id_option  String     @db.Uuid
+  id_user    String     @db.Uuid
+  voted_at   DateTime   @default(now()) @db.Timestamptz(6)
+  PollOption PollOption @relation(fields: [id_option], references: [id_option], onDelete: NoAction, onUpdate: NoAction)
+  Poll       Poll       @relation(fields: [id_poll], references: [id_poll], onDelete: NoAction, onUpdate: NoAction)
+  User       User       @relation(fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([id_poll, id_user], map: "uq_poll_vote_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Post {
+  id_post             String               @id @db.Uuid
+  id_user             String               @db.Uuid
+  id_videogame        String               @db.Uuid
+  id_community        String?              @db.Uuid
+  content             String?
+  image_url           String?              @db.VarChar(500)
+  is_spoiler          Boolean              @default(false)
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?            @db.Timestamptz(6)
+  status              post_status
+  Comment             Comment[]
+  Poll                Poll?
+  Communities         Communities?         @relation(fields: [id_community], references: [id_community], onDelete: NoAction, onUpdate: NoAction)
+  CommunityVideogames CommunityVideogames? @relation(fields: [id_community, id_videogame], references: [id_community, id_videogame], onDelete: NoAction, onUpdate: NoAction)
+  User                User                 @relation(fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  Videogames          Videogames           @relation(fields: [id_videogame], references: [id_videogame], onDelete: NoAction, onUpdate: NoAction)
+  Reaction            Reaction[]
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Reaction {
+  id_user    String   @db.Uuid
+  id_post    String   @db.Uuid
+  reacted_at DateTime @default(now()) @db.Timestamptz(6)
+  Post       Post     @relation(fields: [id_post], references: [id_post], onDelete: NoAction, onUpdate: NoAction)
+  User       User     @relation(fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([id_user, id_post])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model Report {
+  id_report                        String              @id @db.Uuid
+  id_reporter                      String              @db.Uuid
+  content_type                     report_content_type
+  id_reported_content              String              @db.Uuid
+  reason                           report_reason
+  description                      String
+  evidence_url                     String?             @db.VarChar(500)
+  status                           report_status
+  id_reviewed_by                   String?             @db.Uuid
+  review_comment                   String?
+  created_at                       DateTime            @default(now()) @db.Timestamptz(6)
+  reviewed_at                      DateTime?           @db.Timestamptz(6)
+  User_Report_id_reporterToUser    User                @relation("Report_id_reporterToUser", fields: [id_reporter], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  User_Report_id_reviewed_byToUser User?               @relation("Report_id_reviewed_byToUser", fields: [id_reviewed_by], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model User {
+  id_user                                                    String                  @id @db.Uuid
+  username                                                   String                  @unique @db.VarChar(12)
+  email                                                      String                  @unique @db.VarChar(255)
+  birth_date                                                 DateTime                @db.Date
+  gender                                                     gender
+  password_hash                                              String                  @db.VarChar(255)
+  display_name                                               String?                 @db.VarChar(100)
+  description                                                String?
+  profile_photo_url                                          String?                 @db.VarChar(500)
+  is_private                                                 Boolean                 @default(false)
+  created_at                                                 DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                                 DateTime?               @db.Timestamptz(6)
+  account_status                                             account_status
+  ActiveSessions                                             ActiveSessions[]
+  Blocks_Blocks_id_blockedToUser                             Blocks[]                @relation("Blocks_id_blockedToUser")
+  Blocks_Blocks_id_blockerToUser                             Blocks[]                @relation("Blocks_id_blockerToUser")
+  Comment                                                    Comment[]
+  Communities                                                Communities[]
+  CommunityJoinRequests_CommunityJoinRequests_id_adminToUser CommunityJoinRequests[] @relation("CommunityJoinRequests_id_adminToUser")
+  CommunityJoinRequests_CommunityJoinRequests_id_userToUser  CommunityJoinRequests[] @relation("CommunityJoinRequests_id_userToUser")
+  CommunityMembers                                           CommunityMembers[]
+  Conversation_Conversation_id_user_1ToUser                  Conversation[]          @relation("Conversation_id_user_1ToUser")
+  Conversation_Conversation_id_user_2ToUser                  Conversation[]          @relation("Conversation_id_user_2ToUser")
+  FollowRequests_FollowRequests_id_followedToUser            FollowRequests[]        @relation("FollowRequests_id_followedToUser")
+  FollowRequests_FollowRequests_id_followerToUser            FollowRequests[]        @relation("FollowRequests_id_followerToUser")
+  Follows_Follows_id_followedToUser                          Follows[]               @relation("Follows_id_followedToUser")
+  Follows_Follows_id_followerToUser                          Follows[]               @relation("Follows_id_followerToUser")
+  GamerPreference                                            GamerPreference?
+  LfgPost                                                    LfgPost[]
+  Message_Message_id_recipientToUser                         Message[]               @relation("Message_id_recipientToUser")
+  Message_Message_id_senderToUser                            Message[]               @relation("Message_id_senderToUser")
+  Mutes_Mutes_id_mutedToUser                                 Mutes[]                 @relation("Mutes_id_mutedToUser")
+  Mutes_Mutes_id_muterToUser                                 Mutes[]                 @relation("Mutes_id_muterToUser")
+  PollVote                                                   PollVote[]
+  Post                                                       Post[]
+  Reaction                                                   Reaction[]
+  Report_Report_id_reporterToUser                            Report[]                @relation("Report_id_reporterToUser")
+  Report_Report_id_reviewed_byToUser                         Report[]                @relation("Report_id_reviewed_byToUser")
+  UserVideogames                                             UserVideogames[]
+  VideogameRequests_VideogameRequests_id_adminToUser         VideogameRequests[]     @relation("VideogameRequests_id_adminToUser")
+  VideogameRequests_VideogameRequests_id_requesterToUser     VideogameRequests[]     @relation("VideogameRequests_id_requesterToUser")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model UserVideogames {
+  id_user      String     @db.Uuid
+  id_videogame String     @db.Uuid
+  added_at     DateTime   @default(now()) @db.Timestamptz(6)
+  User         User       @relation(fields: [id_user], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  Videogames   Videogames @relation(fields: [id_videogame], references: [id_videogame], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([id_user, id_videogame])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model VideogameRequests {
+  id_request                                String         @id @db.Uuid
+  id_requester                              String         @db.Uuid
+  name                                      String         @db.VarChar(150)
+  description                               String
+  genre                                     String?        @db.VarChar(100)
+  platform                                  String?        @db.VarChar(100)
+  cover_url                                 String?        @db.VarChar(500)
+  additional_info                           String?
+  status                                    request_status
+  id_admin                                  String?        @db.Uuid
+  rejection_reason                          String?
+  created_at                                DateTime       @default(now()) @db.Timestamptz(6)
+  reviewed_at                               DateTime?      @db.Timestamptz(6)
+  id_approved_videogame                     String?        @db.Uuid
+  User_VideogameRequests_id_adminToUser     User?          @relation("VideogameRequests_id_adminToUser", fields: [id_admin], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+  Videogames                                Videogames?    @relation(fields: [id_approved_videogame], references: [id_videogame], onDelete: NoAction, onUpdate: NoAction)
+  User_VideogameRequests_id_requesterToUser User           @relation("VideogameRequests_id_requesterToUser", fields: [id_requester], references: [id_user], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Videogames {
+  id_videogame        String                @id @db.Uuid
+  name                String                @unique @db.VarChar(150)
+  description         String
+  genre               String?               @db.VarChar(100)
+  platform            String?               @db.VarChar(100)
+  cover_url           String?               @db.VarChar(500)
+  additional_info     String?
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  status              videogame_status
+  CommunityVideogames CommunityVideogames[]
+  LfgPost             LfgPost[]
+  Post                Post[]
+  UserVideogames      UserVideogames[]
+  VideogameRequests   VideogameRequests[]
+}
+
+enum account_status {
+  ACTIVE
+  DELETED
+}
+
+enum community_role {
+  ADMIN
+  MEMBER
+}
+
+enum community_status {
+  ACTIVE
+  DELETED
+}
+
+enum community_type {
+  PUBLIC
+  PRIVATE
+}
+
+enum gender {
+  UNDEFINED
+  MALE
+  FEMALE
+  NON_BINARY
+  OTHER
+}
+
+enum lfg_post_status {
+  OPEN
+  COMPLETE
+  CANCELLED
+}
+
+enum play_style {
+  CASUAL
+  COMPETITIVE
+  COOPERATIVE
+  INDIFFERENT
+}
+
+enum poll_status {
+  ACTIVE
+  CLOSED
+}
+
+enum post_status {
+  ACTIVE
+  DELETED
+}
+
+enum report_content_type {
+  POST
+  COMMENT
+  USER
+  COMMUNITY
+}
+
+enum report_reason {
+  TOXICITY
+  INAPPROPRIATE
+  SPAM
+  SPOILER
+  PIRACY
+  OTHER
+}
+
+enum report_status {
+  PENDING
+  IN_REVIEW
+  ATTENDED
+  CLOSED
+}
+
+enum request_status {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum videogame_status {
+  ACTIVE
+  DISABLED
+}
