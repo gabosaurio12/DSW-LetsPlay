@@ -10,7 +10,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Backend Express con 89/89 tests (`/uploads` por magic bytes, `/reports*`, comentarios, vídeos, LFG `scheduledTime`); backend `:3001`, frontend `:5173`, Postgres contenedor `letsplay` `:5439` (con `letsplay_admin` porque `permissions.sql` no expone aún `CommunityVideogames`/`CommunityMembers` a `letsplay_guest`).
 - `database/`: 22 tablas, 14 enums, 42 FKs, 13 vistas + roles; alineado a 1.2.4/1.2.5 y ejecutado OK en cluster PG temporal.
 - `.tickets/`: 5 tickets (`001`–`005`, completados, sin commit/push): `seed.sql`, API backend, frontend (`/` sin moderación, `/admin` con `ModerationPanel`, drag&drop en `GameDetail`, `<input type="time">` en `LfgSearch`).
-- Docs canónicos: 1.1.1, 1.1.2, 1.2.1..1.2.5 (trazabilidad 1.2.3 = CU-01..38), 1.3.1, 1.3.2; `1.5.1` plantilla, `1.5.3` secretos, no existe `1.5.2`.
+- Docs canónicos: 1.1.1, 1.1.2, 1.2.1..1.2.5 (trazabilidad 1.2.3 = CU-01..38), 1.3.1, 1.3.2; `1.5.1` plantilla, `1.5.3` secretos, no existe `1.5.2`.gi
 - Prototipos Figma (`Let-s-Play`, `YJ7S6DSebM5cZkSKu7j7Ek`) en `.routing/STYLE_GUIDE.md` y `.routing/FIGMA_INVENTORY.md` (27 pantallas). `.opencode/` local ignorado por git; `grill-me` solo está en la rama survey.
 - Pendientes Li0: #44/#47 (`README.md`, `.env.example`) y #34 (modelo de presentación).
 
