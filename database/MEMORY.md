@@ -18,6 +18,7 @@ Memoria de PostgreSQL. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 línea
 - Integridad: CHECKs y triggers deferrables (rating 1–5; FK `Post → CommunityVideogames`). Triggers para `Report`, `Conversation`, `Message` (CU-35).
 - Tablas y campos para `is_spoiler`, `Poll*`, `GamerPreference` y `LfgPost`.
 - Ocho vistas filtran por `app.current_user_id`, que el backend fija con `SET LOCAL`.
+- 2026-11-28: la mensajería usa `Conversation` y `Message` sin cambios de esquema. El follow mutuo (cuentas privadas) se valida en el backend dentro de la transacción de envío, no en un trigger. El trigger `fn_validate_message` ya rechaza bloqueos y participantes ajenos.
 
 ## Errores a evitar
 - Las contraseñas de la semilla son placeholders, no bcrypt válido. Crear cuentas nuevas por el registro para probar.
