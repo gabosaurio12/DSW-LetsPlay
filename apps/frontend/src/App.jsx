@@ -5,8 +5,15 @@ import ExploreGames from "./pages/ExploreGames.jsx";
 import GameDetail from "./pages/GameDetail.jsx";
 import LfgSearch from "./pages/LfgSearch.jsx";
 import ModerationPanel from "./pages/ModerationPanel.jsx";
+import LoginForm from "./components/LoginForm.jsx";
+import RegisterForm from "./components/RegisterForm.jsx";
+import RecoveryForm from "./components/RecoveryForm.jsx";
+import { getCurrentUser, logout } from "./services/authService.js";
 import ProfileForm from "./ProfileForm.jsx";
+import WelcomeSurvey from "./WelcomeSurvey.jsx";
+import { loadWelcomeSurvey } from "./services/welcomeSurveyService.js";
 import "./App.css";
+import "./Auth.css";
 
 const VIEWS = {
     EXPLORE: "explore",
@@ -84,13 +91,18 @@ function saveLibraryGames(games) {
 }
 
 /**
- * Application root: renders the Figma-aligned Top Header, Left Sidebar,
- * and active workspace view (Explore Games, Game Detail, or Profile).
+ * Application root: gates access behind authentication and the welcome survey,
+ * then renders the Figma-aligned Top Header, Left Sidebar, and active workspace
+ * view (Explore Games, Game Detail, Profile, LFG, or the admin moderation shell).
  *
  * @returns {JSX.Element} The rendered application.
  */
 function App() {
     const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
+    const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+    const [authView, setAuthView] = useState("login");
+    // Null until the stored survey answers of the session are read.
+    const [surveyCompleted, setSurveyCompleted] = useState(null);
     const [isAdminRoute, setIsAdminRoute] = useState(() =>
         isAdminPathname(window.location.pathname)
     );
@@ -109,6 +121,40 @@ function App() {
         window.addEventListener("popstate", handlePopState);
         return () => window.removeEventListener("popstate", handlePopState);
     }, []);
+
+    useEffect(() => {
+        if (!currentUser) {
+            return undefined;
+        }
+        let isActive = true;
+        const checkSurveyCompletion = async () => {
+            const storedSelection = await loadWelcomeSurvey();
+            if (isActive) {
+                setSurveyCompleted(storedSelection !== null);
+            }
+        };
+        checkSurveyCompletion();
+        return () => {
+            isActive = false;
+        };
+    }, [currentUser]);
+
+    function handleLoginSuccess(user) {
+        setCurrentUser(user);
+    }
+
+    function handleSurveyCompleted() {
+        setSurveyCompleted(true);
+    }
+
+    async function handleLogout() {
+        await logout();
+        setCurrentUser(null);
+        setSurveyCompleted(null);
+        setAuthView("login");
+        setActiveView(VIEWS.EXPLORE);
+        setSelectedGameId(null);
+    }
 
     function handleSelectView(view) {
         if (view === VIEWS.LFG) {
@@ -176,6 +222,72 @@ function App() {
         );
     }
 
+    function renderUserBar() {
+        return (
+            <div className="app-user-bar">
+                <div className="app-user-info">
+                    <span className="app-user-avatar" aria-hidden="true">
+                        {currentUser.username.charAt(0)}
+                    </span>
+                    <span className="app-user-name">@{currentUser.username}</span>
+                </div>
+                <button
+                    type="button"
+                    className="app-logout-button"
+                    onClick={handleLogout}
+                >
+                    {translate("auth.session.logout")}
+                </button>
+            </div>
+        );
+    }
+
+    function renderAuthView() {
+        return (
+            <div className="auth-view-container">
+                {authView === "login" && (
+                    <LoginForm
+                        translate={translate}
+                        onNavigate={setAuthView}
+                        onLoginSuccess={handleLoginSuccess}
+                    />
+                )}
+                {authView === "register" && (
+                    <RegisterForm
+                        translate={translate}
+                        onNavigate={setAuthView}
+                        onLoginSuccess={handleLoginSuccess}
+                    />
+                )}
+                {authView === "recovery" && (
+                    <RecoveryForm
+                        translate={translate}
+                        onNavigate={setAuthView}
+                    />
+                )}
+            </div>
+        );
+    }
+
+    function renderGateLayout(content) {
+        return (
+            <div className="app">
+                <header className="app-header">
+                    <p className="app-brand">
+                        <span className="app-brand-name">{translate("header.title")}</span>
+                    </p>
+
+                    <div className="app-header-actions">
+                        {currentUser && renderUserBar()}
+                        {renderLanguageToggle()}
+                    </div>
+                </header>
+
+                <main className="app-main">{content}</main>
+            </div>
+        );
+    }
+
     function renderWorkspaceContent() {
         if (activeView === VIEWS.PROFILE) {
             return <ProfileForm language={language} />;
@@ -212,6 +324,19 @@ function App() {
         );
     }
 
+    if (!currentUser) {
+        return renderGateLayout(renderAuthView());
+    }
+    if (surveyCompleted === null) {
+        // The stored answers are read asynchronously before choosing a view.
+        return renderGateLayout(null);
+    }
+    if (!surveyCompleted) {
+        return renderGateLayout(
+            <WelcomeSurvey language={language} onCompleted={handleSurveyCompleted} />
+        );
+    }
+
     if (isAdminRoute) {
         return (
             <div className="app">
@@ -228,6 +353,7 @@ function App() {
                     </div>
 
                     <div className="app-header-actions">
+                        {renderUserBar()}
                         {renderLanguageToggle()}
                         <a href="/" className="app-admin-back-link">
                             {translate("adminHeader.backToApp")}
@@ -269,6 +395,7 @@ function App() {
                 </div>
 
                 <div className="app-header-actions">
+                    {renderUserBar()}
                     {renderLanguageToggle()}
 
                     <button

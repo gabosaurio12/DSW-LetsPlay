@@ -1,25 +1,93 @@
 .app {
-    --lp-primary: #bb8484;
-    --lp-primary-hover: #a87070;
-    --lp-primary-tint: #f7eeee;
-    --lp-surface: #ffffff;
-    --lp-canvas: #fcfafa;
-    --lp-input-bg: #f9f7f7;
-    --lp-text-primary: #141414;
-    --lp-text-secondary: #696565;
-    --lp-border: #e8dada;
-    --lp-pill-bg: #eef3ff;
-    --lp-pill-text: #1d4ed8;
-    --lp-font-display: "Sora", system-ui, sans-serif;
-    --lp-font-body: "Inter", system-ui, sans-serif;
+  min-height: 100svh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-family-display);
+  color: #1f1f1f;
+  background-color: #fcfafa;
+  /* Design tokens used by the extra layout styles (sidebar, workspace, ...). */
+  --lp-primary: #bb8484;
+  --lp-primary-hover: #a87070;
+  --lp-primary-tint: #f7eeee;
+  --lp-surface: #ffffff;
+  --lp-canvas: #fcfafa;
+  --lp-input-bg: #f9f7f7;
+  --lp-text-primary: #141414;
+  --lp-text-secondary: #696565;
+  --lp-border: #e8dada;
+  --lp-pill-bg: #eef3ff;
+  --lp-pill-text: #1d4ed8;
+  --lp-font-display: "Sora", system-ui, sans-serif;
+  --lp-font-body: "Inter", system-ui, sans-serif;
+}
 
-    min-height: 100svh;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    background: var(--lp-canvas);
-    color: var(--lp-text-primary);
-    font-family: var(--lp-font-body);
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #ebdfdf;
+  background-color: #ffffff;
+}
+
+.app-brand {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-brand-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--auth-color-primary, #bb8484);
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.app-language-toggle {
+  display: inline-flex;
+  border: 1px solid #ebdcdc;
+  border-radius: 999px;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+.app-language-button {
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.app-language-button--active {
+  color: #ffffff;
+  background: var(--auth-color-primary, #bb8484);
+}
+
+.app-language-button:focus-visible {
+  outline: 2px solid var(--auth-color-primary, #bb8484);
+  outline-offset: -2px;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 16px 64px;
 }
 
 .app-sr-only {
@@ -34,29 +102,6 @@
     border: 0;
 }
 
-.app-header {
-    min-height: 76px;
-    padding: 16px 32px;
-    box-sizing: border-box;
-    background: var(--lp-surface);
-    border-bottom: 1px solid var(--lp-border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-}
-
-.app-brand {
-    padding: 0;
-    border: none;
-    background: transparent;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
 .app-brand-avatar {
     width: 34px;
     height: 34px;
@@ -69,14 +114,6 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-}
-
-.app-brand-name {
-    font-family: var(--lp-font-display);
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--lp-primary);
-    white-space: nowrap;
 }
 
 .app-header-search {
@@ -101,37 +138,6 @@
 
 .app-search-input::placeholder {
     color: var(--lp-text-secondary);
-}
-
-.app-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-shrink: 0;
-}
-
-.app-language-toggle {
-    display: inline-flex;
-    border: 1px solid var(--lp-border);
-    border-radius: 999px;
-    background: var(--lp-surface);
-    overflow: hidden;
-}
-
-.app-language-button {
-    padding: 6px 12px;
-    border: none;
-    background: transparent;
-    color: var(--lp-text-secondary);
-    font-family: var(--lp-font-body);
-    font-size: 0.75rem;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.app-language-button--active {
-    background: var(--lp-primary-tint);
-    color: var(--lp-primary);
 }
 
 .app-create-post-button {
@@ -185,9 +191,7 @@
     border-color: var(--lp-primary);
 }
 
-.app-brand:focus-visible,
 .app-search-input:focus-visible,
-.app-language-button:focus-visible,
 .app-profile-avatar:focus-visible,
 .app-sidebar-item:focus-visible,
 .app-game-pill:focus-visible {
@@ -400,11 +404,6 @@
 }
 
 @media (max-width: 960px) {
-    .app-header {
-        flex-wrap: wrap;
-        padding: 14px 20px;
-    }
-
     .app-header-search {
         order: 3;
         flex: 1 1 100%;
@@ -445,4 +444,31 @@
     .app-workspace {
         padding: 20px 16px 32px;
     }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-main {
+    animation: app-fade-in 0.35s ease-out both;
+  }
+
+  @keyframes app-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 12px 16px;
+  }
+
+  .app-main {
+    padding: 24px 12px 40px;
+  }
 }

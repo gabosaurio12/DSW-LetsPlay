@@ -1,8 +1,10 @@
 .DS_Store
 .obsidian
 .opencode
+opencode.json
 apps/backend/uploads/
 .routing/
 .tickets/
 .agents/skills/*
 !.agents/skills/figma-parity/
+.MEMORY.md
