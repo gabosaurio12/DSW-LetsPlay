@@ -147,6 +147,21 @@
   margin: 0;
 }
 
+.profile-connections {
+    margin-top: 16px;
+}
+
+.profile-connections-button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 999px;
+    background: var(--lp-primary-tint);
+    color: var(--lp-primary);
+    cursor: pointer;
+    font-family: var(--lp-font-display);
+    font-size: 13px;
+}
+
 .profile-actions {
   display: flex;
   justify-content: flex-end;

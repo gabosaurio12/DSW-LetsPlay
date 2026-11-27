@@ -18,6 +18,7 @@ Memoria de la documentación. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50
 - No tratar `1.5.1` ni `1.5.3` como completados.
 
 ## Próximos pasos
+- Corregir IDs de seguimiento: `1.2.3.CasosDeUso.md` asocia CU-26–28 con RF-104–106, pero `1.2.2.EspecificacionFuncional.md` asigna RF-98–100 al seguimiento y RF-104–106 a bloquear/silenciar. Revisar todas las referencias cruzadas antes de renumerar. Detectado el 2026-11-27 durante la fase pública de follows; no se corrigió en esa tarea.
 - RF-127, RN-27 y CU-46 ya describen la persistencia por cuenta (2026-11-28). Falta reflejar sesiones y recuperación de contraseña en 1.2.* cuando se definan.
 - Completar `1.5.1` y crear `1.5.2`.
 - Ampliar `1.5.3`.

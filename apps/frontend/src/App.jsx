@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DEFAULT_LANGUAGE, LANGUAGE_CODES } from "./i18n/i18n.js";
 import { useTranslation } from "./hooks/useTranslation.js";
 import ExploreGames from "./pages/ExploreGames.jsx";
 import GameDetail from "./pages/GameDetail.jsx";
 import LfgSearch from "./pages/LfgSearch.jsx";
+import UserProfile from "./pages/UserProfile.jsx";
 import ModerationPanel from "./pages/ModerationPanel.jsx";
 import LoginForm from "./components/LoginForm.jsx";
 import RegisterForm from "./components/RegisterForm.jsx";
@@ -18,6 +19,7 @@ const VIEWS = {
     EXPLORE: "explore",
     LFG: "lfg",
     PROFILE: "profile",
+    USER_PROFILE: "userProfile",
 };
 
 const ADMIN_ROUTES = new Set(["/admin", "/admin/moderation"]);
@@ -111,6 +113,8 @@ function App() {
         isAdminPathname(window.location.pathname)
     );
     const [activeView, setActiveView] = useState(VIEWS.EXPLORE);
+    const [selectedUserId, setSelectedUserId] = useState(null);
+    const [profileReturnView, setProfileReturnView] = useState(VIEWS.LFG);
     const [selectedGameId, setSelectedGameId] = useState(null);
     const [lfgPreselectedGameId, setLfgPreselectedGameId] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
@@ -189,13 +193,14 @@ function App() {
         setSurveyRetryCount((count) => count + 1);
     }
 
-    function handleSessionExpired() {
+    const handleSessionExpired = useCallback(() => {
         setCurrentUser(null);
         setSurveyCompleted(null);
         setAuthView("login");
         setActiveView(VIEWS.EXPLORE);
         setSelectedGameId(null);
-    }
+        setSelectedUserId(null);
+    }, []);
 
     async function handleLogout() {
         await logout();
@@ -208,7 +213,18 @@ function App() {
         }
         setActiveView(view);
         setSelectedGameId(null);
+        setSelectedUserId(null);
     }
+
+    const handleOpenUserProfile = useCallback((userId) => {
+        if (typeof userId !== "string" || userId.trim() === "") {
+            return;
+        }
+        setProfileReturnView(activeView === VIEWS.USER_PROFILE ? profileReturnView : activeView);
+        setSelectedUserId(userId);
+        setSelectedGameId(null);
+        setActiveView(VIEWS.USER_PROFILE);
+    }, [activeView, profileReturnView]);
 
     function handleFindPlayersForGame(gameId) {
         setLfgPreselectedGameId(gameId || "");
@@ -341,13 +357,34 @@ function App() {
 
     function renderWorkspaceContent() {
         if (activeView === VIEWS.PROFILE) {
-            return <ProfileForm language={language} onSessionExpired={handleSessionExpired} />;
+            return (
+                <ProfileForm
+                    language={language}
+                    currentUserId={currentUser.id}
+                    onOpenUserProfile={handleOpenUserProfile}
+                    onSessionExpired={handleSessionExpired}
+                />
+            );
+        }
+        if (activeView === VIEWS.USER_PROFILE && selectedUserId !== null) {
+            return (
+                <UserProfile
+                    key={selectedUserId}
+                    userId={selectedUserId}
+                    language={language}
+                    currentUserId={currentUser.id}
+                    onBack={() => handleSelectView(profileReturnView)}
+                    onOpenProfile={handleOpenUserProfile}
+                    onSessionExpired={handleSessionExpired}
+                />
+            );
         }
         if (activeView === VIEWS.LFG) {
             return (
                 <LfgSearch
                     language={language}
                     initialGameId={lfgPreselectedGameId}
+                    onOpenUserProfile={handleOpenUserProfile}
                 />
             );
         }
