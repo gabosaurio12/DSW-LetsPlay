@@ -1,138 +1,78 @@
-const crypto = require("crypto");
+const crypto = require("node:crypto");
 
 // Temporary demo user until authentication is implemented.
 const DEMO_USER_ID = "10000000-0000-4000-8000-000000000001";
+const DEFAULT_REMOVAL_COMMENT = "Content removed by moderator";
+const RECORD_NOT_FOUND_CODE = "P2025";
 
-const CONTENT_EXISTENCE_QUERIES = {
-    // LFG posts share the "POST" report content type so they can be reported without altering the DB enum.
-    POST: [
-        `
-SELECT "id_post"
-FROM "Post"
-WHERE "id_post" = $1
-  AND "status" = 'ACTIVE'
-`,
-        `
-SELECT "id_lfg"
-FROM "LfgPost"
-WHERE "id_lfg" = $1
-  AND "status" = 'OPEN'
-`
-    ],
-    COMMENT: [
-        `
-SELECT "id_comment"
-FROM "Comment"
-WHERE "id_comment" = $1
-`
-    ]
+const CREATED_REPORT_SELECT = {
+    id_report: true,
+    id_reporter: true,
+    content_type: true,
+    id_reported_content: true,
+    reason: true,
+    description: true,
+    status: true,
+    id_reviewed_by: true,
+    created_at: true,
+    reviewed_at: true
 };
 
-const INSERT_REPORT_SQL = `
-INSERT INTO "Report" (
-    "id_report",
-    "id_reporter",
-    "content_type",
-    "id_reported_content",
-    "reason",
-    "description",
-    "status",
-    "id_reviewed_by",
-    "reviewed_at"
-)
-VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', NULL, NULL)
-RETURNING "id_report", "id_reporter", "content_type", "id_reported_content",
-          "reason", "description", "status", "id_reviewed_by", "created_at", "reviewed_at"
-`;
+const UPDATED_REPORT_SELECT = {
+    id_report: true,
+    id_reporter: true,
+    content_type: true,
+    id_reported_content: true,
+    reason: true,
+    description: true,
+    evidence_url: true,
+    status: true,
+    id_reviewed_by: true,
+    review_comment: true,
+    created_at: true,
+    reviewed_at: true
+};
 
-const SELECT_REPORTS_BASE_SQL = `
-SELECT r."id_report",
-       r."id_reporter",
-       r."content_type",
-       r."id_reported_content",
-       r."reason",
-       r."description",
-       r."evidence_url",
-       r."status",
-       r."id_reviewed_by",
-       r."review_comment",
-       r."created_at",
-       r."reviewed_at",
-       reporter."username" AS "reporter_username",
-       reporter."display_name" AS "reporter_display_name",
-       reviewer."username" AS "reviewer_username",
-       reviewer."display_name" AS "reviewer_display_name",
-       COALESCE(p."content", lfg."description", c."content") AS "reported_content_preview",
-       COALESCE(
-           p."status"::text,
-           lfg."status"::text,
-           CASE WHEN c."id_comment" IS NOT NULL THEN 'ACTIVE' ELSE NULL END
-       ) AS "reported_content_status"
-FROM "Report" r
-JOIN "User" reporter ON reporter."id_user" = r."id_reporter"
-LEFT JOIN "User" reviewer ON reviewer."id_user" = r."id_reviewed_by"
-LEFT JOIN "Post" p
-       ON r."content_type" = 'POST'
-      AND p."id_post" = r."id_reported_content"
-LEFT JOIN "LfgPost" lfg
-       ON r."content_type" = 'POST'
-      AND lfg."id_lfg" = r."id_reported_content"
-LEFT JOIN "Comment" c
-       ON r."content_type" = 'COMMENT'
-      AND c."id_comment" = r."id_reported_content"
-`;
+const REPORT_LIST_SELECT = {
+    ...UPDATED_REPORT_SELECT,
+    User_Report_id_reporterToUser: { select: { username: true, display_name: true } },
+    User_Report_id_reviewed_byToUser: { select: { username: true, display_name: true } }
+};
 
-const UPDATE_REPORT_STATUS_SQL = `
-UPDATE "Report"
-SET "status" = $2,
-    "review_comment" = COALESCE($3, "review_comment"),
-    "id_reviewed_by" = $4,
-    "reviewed_at" = now()
-WHERE "id_report" = $1
-RETURNING "id_report", "id_reporter", "content_type", "id_reported_content",
-          "reason", "description", "evidence_url", "status", "id_reviewed_by",
-          "review_comment", "created_at", "reviewed_at"
-`;
+/**
+ * Resolves the reported content preview and status for a report, following the
+ * content type. LFG posts share the POST content type.
+ *
+ * @param {{ content_type: string, id_reported_content: string }} report - Report row.
+ * @param {{ posts: Map, lfgPosts: Map, comments: Map }} contentById - Reported content indexed by id.
+ * @returns {{ reported_content_preview: string|null, reported_content_status: string|null }}
+ * Preview text and status of the reported content.
+ */
+function resolveReportedContent(report, contentById) {
+    if (report.content_type === "POST") {
+        const post = contentById.posts.get(report.id_reported_content);
+        const lfgPost = contentById.lfgPosts.get(report.id_reported_content);
+        return {
+            reported_content_preview: post?.content ?? lfgPost?.description ?? null,
+            reported_content_status: post?.status ?? lfgPost?.status ?? null
+        };
+    }
 
-const SELECT_REPORT_TARGET_SQL = `
-SELECT "id_report", "content_type", "id_reported_content"
-FROM "Report"
-WHERE "id_report" = $1
-`;
+    if (report.content_type === "COMMENT") {
+        const comment = contentById.comments.get(report.id_reported_content);
+        return {
+            reported_content_preview: comment?.content ?? null,
+            reported_content_status: comment ? "ACTIVE" : null
+        };
+    }
 
-const SOFT_DELETE_POST_SQL = `
-UPDATE "Post"
-SET "status" = 'DELETED'
-WHERE "id_post" = $1
-`;
-
-const CANCEL_LFG_POST_SQL = `
-UPDATE "LfgPost"
-SET "status" = 'CANCELLED'
-WHERE "id_lfg" = $1
-`;
-
-const DELETE_COMMENT_SQL = `
-DELETE FROM "Comment"
-WHERE "id_comment" = $1
-`;
-
-const ATTEND_REMOVED_REPORT_SQL = `
-UPDATE "Report"
-SET "status" = 'ATTENDED',
-    "id_reviewed_by" = $3,
-    "reviewed_at" = now(),
-    "review_comment" = COALESCE(NULLIF($2, ''), "review_comment", 'Content removed by moderator')
-WHERE "id_report" = $1
-RETURNING "id_report", "id_reporter", "content_type", "id_reported_content",
-          "reason", "description", "evidence_url", "status", "id_reviewed_by",
-          "review_comment", "created_at", "reviewed_at"
-`;
+    return { reported_content_preview: null, reported_content_status: null };
+}
 
 /**
  * Creates a reusable repository for persisting and moderating content reports.
  *
- * @param {import("pg").Pool} pool - PostgreSQL pool instance.
+ * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance.
  * @returns {{
  *   createReport: Function,
  *   findReports: Function,
@@ -140,41 +80,87 @@ RETURNING "id_report", "id_reporter", "content_type", "id_reported_content",
  *   removeReportedContentAndAttend: Function
  * }} Report repository methods.
  */
-function createReportRepository(pool) {
-    async function withTransaction(work) {
-        // Use a dedicated client transaction when pool.connect is available; fall back to pool.query for simple unit test mocks.
-        if (typeof pool.connect !== "function") {
-            return work(pool);
-        }
-
-        const client = await pool.connect();
-        try {
-            await client.query("BEGIN");
-            const result = await work(client);
-            await client.query("COMMIT");
-            return result;
-        } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-        } finally {
-            client.release();
-        }
+function createReportRepository(prisma) {
+    function findActivePost(id) {
+        return prisma.post.findFirst({
+            where: { id_post: id, status: "ACTIVE" },
+            select: { id_post: true }
+        });
     }
 
+    function findOpenLfgPost(id) {
+        return prisma.lfgPost.findFirst({
+            where: { id_lfg: id, status: "OPEN" },
+            select: { id_lfg: true }
+        });
+    }
+
+    function findComment(id) {
+        return prisma.comment.findFirst({
+            where: { id_comment: id },
+            select: { id_comment: true }
+        });
+    }
+
+    const CONTENT_EXISTENCE_CHECKS = {
+        // LFG posts share the "POST" report content type so they can be reported without altering the DB enum.
+        POST: [findActivePost, findOpenLfgPost],
+        COMMENT: [findComment]
+    };
+
     async function contentExists(contentType, reportedContentId) {
-        const queries = CONTENT_EXISTENCE_QUERIES[contentType];
-        if (!queries) {
+        const checks = CONTENT_EXISTENCE_CHECKS[contentType];
+        if (!checks) {
             return true;
         }
 
-        for (const sql of queries) {
-            const existenceResult = await pool.query(sql, [reportedContentId]);
-            if (existenceResult.rows.length > 0) {
-                return true;
-            }
-        }
+        const found = await Promise.all(checks.map((check) => check(reportedContentId)));
+        return found.some(Boolean);
+    }
 
-        return false;
+    async function findReportedContentById(reports) {
+        const idsOfType = (type) => reports
+            .filter((report) => report.content_type === type)
+            .map((report) => report.id_reported_content);
+        const postIds = idsOfType("POST");
+
+        const [posts, lfgPosts, comments] = await Promise.all([
+            prisma.post.findMany({
+                where: { id_post: { in: postIds } },
+                select: { id_post: true, content: true, status: true }
+            }),
+            prisma.lfgPost.findMany({
+                where: { id_lfg: { in: postIds } },
+                select: { id_lfg: true, description: true, status: true }
+            }),
+            prisma.comment.findMany({
+                where: { id_comment: { in: idsOfType("COMMENT") } },
+                select: { id_comment: true, content: true }
+            })
+        ]);
+
+        return {
+            posts: new Map(posts.map((post) => [post.id_post, post])),
+            lfgPosts: new Map(lfgPosts.map((lfgPost) => [lfgPost.id_lfg, lfgPost])),
+            comments: new Map(comments.map((comment) => [comment.id_comment, comment]))
+        };
+    }
+
+    async function removeReportedContent(tx, report) {
+        if (report.content_type === "POST") {
+            const { count } = await tx.post.updateMany({
+                where: { id_post: report.id_reported_content },
+                data: { status: "DELETED" }
+            });
+            if (count === 0) {
+                await tx.lfgPost.updateMany({
+                    where: { id_lfg: report.id_reported_content },
+                    data: { status: "CANCELLED" }
+                });
+            }
+        } else if (report.content_type === "COMMENT") {
+            await tx.comment.deleteMany({ where: { id_comment: report.id_reported_content } });
+        }
     }
 
     /**
@@ -195,20 +181,19 @@ function createReportRepository(pool) {
             return null;
         }
 
-        const reportId = crypto.randomUUID();
         // Replace DEMO_USER_ID with the authenticated user id once auth is implemented.
-        const resolvedReporterId = reporterId || DEMO_USER_ID;
-
-        const result = await pool.query(INSERT_REPORT_SQL, [
-            reportId,
-            resolvedReporterId,
-            contentType,
-            reportedContentId,
-            reason,
-            description
-        ]);
-
-        return result.rows[0] || null;
+        return prisma.report.create({
+            data: {
+                id_report: crypto.randomUUID(),
+                id_reporter: reporterId || DEMO_USER_ID,
+                content_type: contentType,
+                id_reported_content: reportedContentId,
+                reason,
+                description,
+                status: "PENDING"
+            },
+            select: CREATED_REPORT_SELECT
+        });
     }
 
     /**
@@ -218,17 +203,21 @@ function createReportRepository(pool) {
      * @returns {Promise<object[]>} Matching report rows.
      */
     async function findReports({ status } = {}) {
-        const params = [];
-        let whereClause = "";
+        const reports = await prisma.report.findMany({
+            where: status ? { status } : undefined,
+            select: REPORT_LIST_SELECT,
+            orderBy: { created_at: "desc" }
+        });
+        const contentById = await findReportedContentById(reports);
 
-        if (status) {
-            params.push(status);
-            whereClause = `\nWHERE r."status" = $1`;
-        }
-
-        const sql = `${SELECT_REPORTS_BASE_SQL}${whereClause}\nORDER BY r."created_at" DESC`;
-        const result = await pool.query(sql, params);
-        return result.rows;
+        return reports.map(({ User_Report_id_reporterToUser, User_Report_id_reviewed_byToUser, ...report }) => ({
+            ...report,
+            reporter_username: User_Report_id_reporterToUser.username,
+            reporter_display_name: User_Report_id_reporterToUser.display_name,
+            reviewer_username: User_Report_id_reviewed_byToUser?.username ?? null,
+            reviewer_display_name: User_Report_id_reviewed_byToUser?.display_name ?? null,
+            ...resolveReportedContent(report, contentById)
+        }));
     }
 
     /**
@@ -243,19 +232,27 @@ function createReportRepository(pool) {
      * @returns {Promise<object|null>} Updated report row or null if the report does not exist.
      */
     async function updateReportStatus({ reportId, status, reviewComment, reviewerId }) {
-        const resolvedReviewerId = reviewerId || DEMO_USER_ID;
         const resolvedReviewComment = typeof reviewComment === "string" && reviewComment.trim().length > 0
             ? reviewComment.trim()
-            : null;
+            : undefined;
 
-        const result = await pool.query(UPDATE_REPORT_STATUS_SQL, [
-            reportId,
-            status,
-            resolvedReviewComment,
-            resolvedReviewerId
-        ]);
-
-        return result.rows[0] || null;
+        try {
+            return await prisma.report.update({
+                where: { id_report: reportId },
+                data: {
+                    status,
+                    review_comment: resolvedReviewComment,
+                    id_reviewed_by: reviewerId || DEMO_USER_ID,
+                    reviewed_at: new Date()
+                },
+                select: UPDATED_REPORT_SELECT
+            });
+        } catch (error) {
+            if (error.code === RECORD_NOT_FOUND_CODE) {
+                return null;
+            }
+            throw error;
+        }
     }
 
     /**
@@ -272,30 +269,27 @@ function createReportRepository(pool) {
         const resolvedReviewerId = reviewerId || DEMO_USER_ID;
         const resolvedReviewComment = typeof reviewComment === "string" ? reviewComment.trim() : "";
 
-        return withTransaction(async (client) => {
-            const reportResult = await client.query(SELECT_REPORT_TARGET_SQL, [reportId]);
-            if (reportResult.rows.length === 0) {
+        return prisma.$transaction(async (tx) => {
+            const report = await tx.report.findUnique({
+                where: { id_report: reportId },
+                select: { id_report: true, content_type: true, id_reported_content: true, review_comment: true }
+            });
+            if (!report) {
                 return null;
             }
 
-            const report = reportResult.rows[0];
+            await removeReportedContent(tx, report);
 
-            if (report.content_type === "POST") {
-                const postResult = await client.query(SOFT_DELETE_POST_SQL, [report.id_reported_content]);
-                if ((postResult.rowCount ?? 0) === 0) {
-                    await client.query(CANCEL_LFG_POST_SQL, [report.id_reported_content]);
-                }
-            } else if (report.content_type === "COMMENT") {
-                await client.query(DELETE_COMMENT_SQL, [report.id_reported_content]);
-            }
-
-            const updateResult = await client.query(ATTEND_REMOVED_REPORT_SQL, [
-                reportId,
-                resolvedReviewComment,
-                resolvedReviewerId
-            ]);
-
-            return updateResult.rows[0] || null;
+            return tx.report.update({
+                where: { id_report: reportId },
+                data: {
+                    status: "ATTENDED",
+                    id_reviewed_by: resolvedReviewerId,
+                    reviewed_at: new Date(),
+                    review_comment: resolvedReviewComment || (report.review_comment ?? DEFAULT_REMOVAL_COMMENT)
+                },
+                select: UPDATED_REPORT_SELECT
+            });
         });
     }
 

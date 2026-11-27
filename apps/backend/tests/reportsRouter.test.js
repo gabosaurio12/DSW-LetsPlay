@@ -486,17 +486,40 @@ describe("reportsRouter moderation access", () => {
     });
 });
 
+function createFakePrisma(models) {
+    const prisma = { ...models };
+    prisma.$transaction = async (work) => work(prisma);
+    return prisma;
+}
+
+const UNEXPECTED_LOOKUP = async () => {
+    assert.fail("no content lookup is expected for this content type");
+};
+
 describe("reportRepository", () => {
     it("createReport returns null when neither active post nor open LFG post is found", async () => {
-        const queries = [];
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                return { rows: [] };
+        const lookups = [];
+        const prisma = createFakePrisma({
+            post: {
+                async findFirst(args) {
+                    lookups.push(args);
+                    return null;
+                }
+            },
+            lfgPost: {
+                async findFirst(args) {
+                    lookups.push(args);
+                    return null;
+                }
+            },
+            report: {
+                async create() {
+                    assert.fail("create must not run when the content is missing");
+                }
             }
-        };
+        });
 
-        const repository = createReportRepository(pool);
+        const repository = createReportRepository(prisma);
         const result = await repository.createReport({
             contentType: "POST",
             reportedContentId: SAMPLE_CONTENT_ID,
@@ -505,18 +528,12 @@ describe("reportRepository", () => {
         });
 
         assert.equal(result, null);
-        assert.equal(queries.length, 2);
-        assert.match(queries[0].sql, /FROM "Post"/);
-        assert.match(queries[0].sql, /"status" = 'ACTIVE'/);
-        assert.deepEqual(queries[0].params, [SAMPLE_CONTENT_ID]);
-        assert.match(queries[1].sql, /FROM "LfgPost"/);
-        assert.match(queries[1].sql, /"id_lfg" = \$1/);
-        assert.match(queries[1].sql, /"status" = 'OPEN'/);
-        assert.deepEqual(queries[1].params, [SAMPLE_CONTENT_ID]);
+        assert.equal(lookups.length, 2);
+        assert.deepEqual(lookups[0].where, { id_post: SAMPLE_CONTENT_ID, status: "ACTIVE" });
+        assert.deepEqual(lookups[1].where, { id_lfg: SAMPLE_CONTENT_ID, status: "OPEN" });
     });
 
-    it("createReport falls back to open LfgPost when active Post is not found", async () => {
-        const queries = [];
+    it("createReport accepts an open LfgPost when no active Post is found", async () => {
         const createdRow = {
             id_report: "generated",
             id_reporter: DEMO_USER_ID,
@@ -529,21 +546,27 @@ describe("reportRepository", () => {
             created_at: "2026-01-01T00:00:00.000Z",
             reviewed_at: null
         };
-
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                if (queries.length === 1) {
-                    return { rows: [] };
+        const creates = [];
+        const prisma = createFakePrisma({
+            post: {
+                async findFirst() {
+                    return null;
                 }
-                if (queries.length === 2) {
-                    return { rows: [{ id_lfg: SAMPLE_CONTENT_ID }] };
+            },
+            lfgPost: {
+                async findFirst() {
+                    return { id_lfg: SAMPLE_CONTENT_ID };
                 }
-                return { rows: [createdRow] };
+            },
+            report: {
+                async create(args) {
+                    creates.push(args);
+                    return createdRow;
+                }
             }
-        };
+        });
 
-        const repository = createReportRepository(pool);
+        const repository = createReportRepository(prisma);
         const result = await repository.createReport({
             contentType: "POST",
             reportedContentId: SAMPLE_CONTENT_ID,
@@ -552,27 +575,28 @@ describe("reportRepository", () => {
         });
 
         assert.deepEqual(result, createdRow);
-        assert.equal(queries.length, 3);
-        assert.match(queries[0].sql, /FROM "Post"/);
-        assert.match(queries[1].sql, /FROM "LfgPost"/);
-        assert.match(queries[1].sql, /"id_lfg" = \$1/);
-        assert.match(queries[1].sql, /"status" = 'OPEN'/);
-        assert.deepEqual(queries[1].params, [SAMPLE_CONTENT_ID]);
-        assert.match(queries[2].sql, /INSERT INTO "Report"/);
-        assert.equal(queries[2].params[2], "POST");
-        assert.equal(queries[2].params[3], SAMPLE_CONTENT_ID);
+        assert.equal(creates.length, 1);
+        assert.equal(creates[0].data.content_type, "POST");
+        assert.equal(creates[0].data.id_reported_content, SAMPLE_CONTENT_ID);
     });
 
     it("createReport returns null when comment is not found", async () => {
-        const queries = [];
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                return { rows: [] };
+        const lookups = [];
+        const prisma = createFakePrisma({
+            comment: {
+                async findFirst(args) {
+                    lookups.push(args);
+                    return null;
+                }
+            },
+            report: {
+                async create() {
+                    assert.fail("create must not run when the comment is missing");
+                }
             }
-        };
+        });
 
-        const repository = createReportRepository(pool);
+        const repository = createReportRepository(prisma);
         const result = await repository.createReport({
             contentType: "COMMENT",
             reportedContentId: SAMPLE_CONTENT_ID,
@@ -581,80 +605,67 @@ describe("reportRepository", () => {
         });
 
         assert.equal(result, null);
-        assert.equal(queries.length, 1);
-        assert.match(queries[0].sql, /FROM "Comment"/);
-        assert.deepEqual(queries[0].params, [SAMPLE_CONTENT_ID]);
+        assert.equal(lookups.length, 1);
+        assert.deepEqual(lookups[0].where, { id_comment: SAMPLE_CONTENT_ID });
     });
 
     it("createReport inserts with generated UUID, demo user, and PENDING status when reporterId is omitted", async () => {
-        const queries = [];
-        const createdRow = {
-            id_report: "generated",
-            id_reporter: DEMO_USER_ID,
-            content_type: "POST",
-            id_reported_content: SAMPLE_CONTENT_ID,
-            reason: "PIRACY",
-            description: "Pirated link",
-            status: "PENDING",
-            id_reviewed_by: null,
-            created_at: "2026-01-01T00:00:00.000Z",
-            reviewed_at: null
-        };
-
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                if (queries.length === 1) {
-                    return { rows: [{ id_post: SAMPLE_CONTENT_ID }] };
+        const creates = [];
+        const prisma = createFakePrisma({
+            post: {
+                async findFirst() {
+                    return { id_post: SAMPLE_CONTENT_ID };
                 }
-                return { rows: [createdRow] };
+            },
+            lfgPost: {
+                async findFirst() {
+                    return null;
+                }
+            },
+            report: {
+                async create(args) {
+                    creates.push(args);
+                    return { id_report: args.data.id_report };
+                }
             }
-        };
+        });
 
-        const repository = createReportRepository(pool);
-        const result = await repository.createReport({
+        const repository = createReportRepository(prisma);
+        await repository.createReport({
             contentType: "POST",
             reportedContentId: SAMPLE_CONTENT_ID,
             reason: "PIRACY",
             description: "Pirated link"
         });
 
-        assert.deepEqual(result, createdRow);
-        assert.equal(queries.length, 2);
-        assert.match(queries[1].sql, /INSERT INTO "Report"/);
-        assert.match(queries[1].sql, /'PENDING', NULL, NULL/);
-        assert.match(queries[1].params[0], UUID_REGEX);
-        assert.equal(queries[1].params[1], DEMO_USER_ID);
-        assert.equal(queries[1].params[2], "POST");
-        assert.equal(queries[1].params[3], SAMPLE_CONTENT_ID);
-        assert.equal(queries[1].params[4], "PIRACY");
-        assert.equal(queries[1].params[5], "Pirated link");
+        assert.equal(creates.length, 1);
+        assert.match(creates[0].data.id_report, UUID_REGEX);
+        assert.deepEqual(creates[0].data, {
+            id_report: creates[0].data.id_report,
+            id_reporter: DEMO_USER_ID,
+            content_type: "POST",
+            id_reported_content: SAMPLE_CONTENT_ID,
+            reason: "PIRACY",
+            description: "Pirated link",
+            status: "PENDING"
+        });
     });
 
-    it("createReport uses explicit reporterId for USER or COMMUNITY without post/comment lookup", async () => {
-        const queries = [];
-        const createdRow = {
-            id_report: "generated",
-            id_reporter: SAMPLE_REPORTER_ID,
-            content_type: "COMMUNITY",
-            id_reported_content: SAMPLE_CONTENT_ID,
-            reason: "OTHER",
-            description: "Off-topic community",
-            status: "PENDING",
-            id_reviewed_by: null,
-            created_at: "2026-01-01T00:00:00.000Z",
-            reviewed_at: null
-        };
-
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                return { rows: [createdRow] };
+    it("createReport uses explicit reporterId for USER or COMMUNITY without content lookup", async () => {
+        const creates = [];
+        const prisma = createFakePrisma({
+            post: { findFirst: UNEXPECTED_LOOKUP },
+            comment: { findFirst: UNEXPECTED_LOOKUP },
+            report: {
+                async create(args) {
+                    creates.push(args);
+                    return { id_report: args.data.id_report };
+                }
             }
-        };
+        });
 
-        const repository = createReportRepository(pool);
-        const result = await repository.createReport({
+        const repository = createReportRepository(prisma);
+        await repository.createReport({
             reporterId: SAMPLE_REPORTER_ID,
             contentType: "COMMUNITY",
             reportedContentId: SAMPLE_CONTENT_ID,
@@ -662,58 +673,104 @@ describe("reportRepository", () => {
             description: "Off-topic community"
         });
 
-        assert.deepEqual(result, createdRow);
-        assert.equal(queries.length, 1);
-        assert.equal(queries[0].params[1], SAMPLE_REPORTER_ID);
-        assert.equal(queries[0].params[2], "COMMUNITY");
+        assert.equal(creates.length, 1);
+        assert.equal(creates[0].data.id_reporter, SAMPLE_REPORTER_ID);
+        assert.equal(creates[0].data.content_type, "COMMUNITY");
     });
 
-    it("findReports joins reporter, reviewer, and reported content with optional status filter", async () => {
-        const queries = [];
-        const rows = [{ id_report: SAMPLE_REPORT_ID, status: "PENDING" }];
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                return { rows };
-            }
+    it("findReports maps reporter, reviewer, and reported content with optional status filter", async () => {
+        const reportQueries = [];
+        const reportRow = {
+            id_report: SAMPLE_REPORT_ID,
+            id_reporter: SAMPLE_REPORTER_ID,
+            content_type: "POST",
+            id_reported_content: SAMPLE_CONTENT_ID,
+            reason: "SPAM",
+            description: "Spam",
+            evidence_url: null,
+            status: "PENDING",
+            id_reviewed_by: null,
+            review_comment: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            reviewed_at: null,
+            User_Report_id_reporterToUser: { username: "reporter", display_name: "Reporter" },
+            User_Report_id_reviewed_byToUser: null
         };
+        const prisma = createFakePrisma({
+            report: {
+                async findMany(args) {
+                    reportQueries.push(args);
+                    return [reportRow];
+                }
+            },
+            post: {
+                async findMany() {
+                    return [{ id_post: SAMPLE_CONTENT_ID, content: "Buy now", status: "ACTIVE" }];
+                }
+            },
+            lfgPost: {
+                async findMany() {
+                    return [];
+                }
+            },
+            comment: {
+                async findMany() {
+                    return [];
+                }
+            }
+        });
 
-        const repository = createReportRepository(pool);
+        const repository = createReportRepository(prisma);
         const allReports = await repository.findReports();
-        const pendingReports = await repository.findReports({ status: "PENDING" });
+        await repository.findReports({ status: "PENDING" });
 
-        assert.deepEqual(allReports, rows);
-        assert.deepEqual(pendingReports, rows);
-        assert.equal(queries.length, 2);
-        assert.match(queries[0].sql, /FROM "Report" r/);
-        assert.match(queries[0].sql, /LEFT JOIN "Post" p/);
-        assert.match(queries[0].sql, /LEFT JOIN "LfgPost" lfg/);
-        assert.match(queries[0].sql, /LEFT JOIN "Comment" c/);
-        assert.match(queries[0].sql, /ORDER BY r\."created_at" DESC/);
-        assert.deepEqual(queries[0].params, []);
-        assert.match(queries[1].sql, /WHERE r\."status" = \$1/);
-        assert.deepEqual(queries[1].params, ["PENDING"]);
+        assert.equal(allReports.length, 1);
+        assert.deepEqual(allReports[0], {
+            id_report: SAMPLE_REPORT_ID,
+            id_reporter: SAMPLE_REPORTER_ID,
+            content_type: "POST",
+            id_reported_content: SAMPLE_CONTENT_ID,
+            reason: "SPAM",
+            description: "Spam",
+            evidence_url: null,
+            status: "PENDING",
+            id_reviewed_by: null,
+            review_comment: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            reviewed_at: null,
+            reporter_username: "reporter",
+            reporter_display_name: "Reporter",
+            reviewer_username: null,
+            reviewer_display_name: null,
+            reported_content_preview: "Buy now",
+            reported_content_status: "ACTIVE"
+        });
+        assert.equal(reportQueries[0].where, undefined);
+        assert.deepEqual(reportQueries[0].orderBy, { created_at: "desc" });
+        assert.deepEqual(reportQueries[1].where, { status: "PENDING" });
     });
 
     it("updateReportStatus sets reviewer and reviewed_at and returns null when missing", async () => {
-        const queries = [];
+        const updates = [];
         const updatedRow = {
             id_report: SAMPLE_REPORT_ID,
             status: "IN_REVIEW",
             id_reviewed_by: DEMO_USER_ID,
             review_comment: "Checking"
         };
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                if (queries.length === 1) {
-                    return { rows: [] };
+        const prisma = createFakePrisma({
+            report: {
+                async update(args) {
+                    updates.push(args);
+                    if (updates.length === 1) {
+                        throw Object.assign(new Error("Record not found"), { code: "P2025" });
+                    }
+                    return updatedRow;
                 }
-                return { rows: [updatedRow] };
             }
-        };
+        });
 
-        const repository = createReportRepository(pool);
+        const repository = createReportRepository(prisma);
         const missing = await repository.updateReportStatus({
             reportId: SAMPLE_REPORT_ID,
             status: "IN_REVIEW"
@@ -721,171 +778,194 @@ describe("reportRepository", () => {
         const updated = await repository.updateReportStatus({
             reportId: SAMPLE_REPORT_ID,
             status: "IN_REVIEW",
-            reviewComment: "Checking"
+            reviewComment: "  Checking  "
         });
 
         assert.equal(missing, null);
         assert.deepEqual(updated, updatedRow);
-        assert.match(queries[1].sql, /UPDATE "Report"/);
-        assert.match(queries[1].sql, /"reviewed_at" = now\(\)/);
-        assert.deepEqual(queries[1].params, [SAMPLE_REPORT_ID, "IN_REVIEW", "Checking", DEMO_USER_ID]);
+        assert.deepEqual(updates[1].where, { id_report: SAMPLE_REPORT_ID });
+        assert.equal(updates[1].data.status, "IN_REVIEW");
+        assert.equal(updates[1].data.review_comment, "Checking");
+        assert.equal(updates[1].data.id_reviewed_by, DEMO_USER_ID);
+        assert.ok(updates[1].data.reviewed_at instanceof Date);
     });
 
-    it("removeReportedContentAndAttend uses a transaction to soft-delete a Post and attend the report", async () => {
-        const queries = [];
-        let released = false;
+    it("updateReportStatus rethrows unexpected database errors", async () => {
+        const prisma = createFakePrisma({
+            report: {
+                async update() {
+                    throw new Error("DB failure");
+                }
+            }
+        });
+
+        const repository = createReportRepository(prisma);
+        await assert.rejects(
+            () => repository.updateReportStatus({ reportId: SAMPLE_REPORT_ID, status: "CLOSED" }),
+            /DB failure/
+        );
+    });
+
+    it("removeReportedContentAndAttend soft-deletes a Post and attends the report in a transaction", async () => {
+        const calls = [];
         const attendedRow = {
             id_report: SAMPLE_REPORT_ID,
             status: "ATTENDED",
             id_reviewed_by: SAMPLE_REVIEWER_ID,
             review_comment: "Content removed by moderator"
         };
-
-        const pool = {
-            async connect() {
-                return {
-                    async query(sql, params) {
-                        queries.push({ sql, params });
-                        if (sql.includes('FROM "Report"')) {
-                            return {
-                                rows: [{
-                                    id_report: SAMPLE_REPORT_ID,
-                                    content_type: "POST",
-                                    id_reported_content: SAMPLE_CONTENT_ID
-                                }]
-                            };
-                        }
-                        if (sql.includes('UPDATE "Post"')) {
-                            return { rows: [], rowCount: 1 };
-                        }
-                        if (sql.includes('UPDATE "Report"')) {
-                            return { rows: [attendedRow], rowCount: 1 };
-                        }
-                        return { rows: [], rowCount: 0 };
-                    },
-                    release() {
-                        released = true;
-                    }
-                };
+        const prisma = createFakePrisma({
+            report: {
+                async findUnique() {
+                    return {
+                        id_report: SAMPLE_REPORT_ID,
+                        content_type: "POST",
+                        id_reported_content: SAMPLE_CONTENT_ID,
+                        review_comment: null
+                    };
+                },
+                async update(args) {
+                    calls.push({ model: "report", args });
+                    return attendedRow;
+                }
+            },
+            post: {
+                async updateMany(args) {
+                    calls.push({ model: "post", args });
+                    return { count: 1 };
+                }
+            },
+            lfgPost: {
+                async updateMany() {
+                    assert.fail("LFG post must not be cancelled when the Post was updated");
+                }
             }
-        };
+        });
 
-        const repository = createReportRepository(pool);
+        const repository = createReportRepository(prisma);
         const result = await repository.removeReportedContentAndAttend({
             reportId: SAMPLE_REPORT_ID,
             reviewerId: SAMPLE_REVIEWER_ID
         });
 
         assert.deepEqual(result, attendedRow);
-        assert.equal(released, true);
-        assert.equal(queries[0].sql, "BEGIN");
-        assert.match(queries[1].sql, /FROM "Report"/);
-        assert.match(queries[2].sql, /UPDATE "Post"/);
-        assert.match(queries[2].sql, /'DELETED'/);
-        assert.match(queries[3].sql, /UPDATE "Report"/);
-        assert.match(queries[3].sql, /'ATTENDED'/);
-        assert.equal(queries[4].sql, "COMMIT");
+        assert.deepEqual(calls[0], {
+            model: "post",
+            args: { where: { id_post: SAMPLE_CONTENT_ID }, data: { status: "DELETED" } }
+        });
+        assert.equal(calls[1].model, "report");
+        assert.equal(calls[1].args.data.status, "ATTENDED");
+        assert.equal(calls[1].args.data.id_reviewed_by, SAMPLE_REVIEWER_ID);
+        assert.equal(calls[1].args.data.review_comment, "Content removed by moderator");
     });
 
-    it("removeReportedContentAndAttend falls back to cancelling LfgPost when Post rowCount is 0", async () => {
-        const queries = [];
-        const attendedRow = { id_report: SAMPLE_REPORT_ID, status: "ATTENDED" };
-
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                if (sql.includes('FROM "Report"')) {
+    it("removeReportedContentAndAttend cancels the LfgPost when no Post was updated", async () => {
+        const lfgUpdates = [];
+        const reportUpdates = [];
+        const prisma = createFakePrisma({
+            report: {
+                async findUnique() {
                     return {
-                        rows: [{
-                            id_report: SAMPLE_REPORT_ID,
-                            content_type: "POST",
-                            id_reported_content: SAMPLE_CONTENT_ID
-                        }]
+                        id_report: SAMPLE_REPORT_ID,
+                        content_type: "POST",
+                        id_reported_content: SAMPLE_CONTENT_ID,
+                        review_comment: "Earlier note"
                     };
+                },
+                async update(args) {
+                    reportUpdates.push(args);
+                    return { id_report: SAMPLE_REPORT_ID, status: "ATTENDED" };
                 }
-                if (sql.includes('UPDATE "Post"')) {
-                    return { rows: [], rowCount: 0 };
+            },
+            post: {
+                async updateMany() {
+                    return { count: 0 };
                 }
-                if (sql.includes('UPDATE "LfgPost"')) {
-                    return { rows: [], rowCount: 1 };
+            },
+            lfgPost: {
+                async updateMany(args) {
+                    lfgUpdates.push(args);
+                    return { count: 1 };
                 }
-                return { rows: [attendedRow], rowCount: 1 };
             }
-        };
+        });
 
-        const repository = createReportRepository(pool);
+        const repository = createReportRepository(prisma);
         const result = await repository.removeReportedContentAndAttend({
             reportId: SAMPLE_REPORT_ID,
             reviewComment: "Cancelled LFG"
         });
 
-        assert.deepEqual(result, attendedRow);
-        assert.equal(queries.length, 4);
-        assert.match(queries[1].sql, /UPDATE "Post"/);
-        assert.match(queries[2].sql, /UPDATE "LfgPost"/);
-        assert.match(queries[2].sql, /'CANCELLED'/);
-        assert.match(queries[3].sql, /UPDATE "Report"/);
-        assert.deepEqual(queries[3].params, [SAMPLE_REPORT_ID, "Cancelled LFG", DEMO_USER_ID]);
+        assert.deepEqual(result, { id_report: SAMPLE_REPORT_ID, status: "ATTENDED" });
+        assert.deepEqual(lfgUpdates[0], {
+            where: { id_lfg: SAMPLE_CONTENT_ID },
+            data: { status: "CANCELLED" }
+        });
+        assert.equal(reportUpdates[0].data.review_comment, "Cancelled LFG");
     });
 
-    it("removeReportedContentAndAttend deletes Comment and rolls back on failure", async () => {
-        const commentQueries = [];
-        const attendedRow = { id_report: SAMPLE_REPORT_ID, status: "ATTENDED" };
-
-        const commentPool = {
-            async query(sql, params) {
-                commentQueries.push({ sql, params });
-                if (sql.includes('FROM "Report"')) {
+    it("removeReportedContentAndAttend keeps the existing review comment when none is sent", async () => {
+        const reportUpdates = [];
+        const prisma = createFakePrisma({
+            report: {
+                async findUnique() {
                     return {
-                        rows: [{
-                            id_report: SAMPLE_REPORT_ID,
-                            content_type: "COMMENT",
-                            id_reported_content: SAMPLE_CONTENT_ID
-                        }]
+                        id_report: SAMPLE_REPORT_ID,
+                        content_type: "COMMENT",
+                        id_reported_content: SAMPLE_CONTENT_ID,
+                        review_comment: "Earlier note"
                     };
+                },
+                async update(args) {
+                    reportUpdates.push(args);
+                    return { id_report: SAMPLE_REPORT_ID, status: "ATTENDED" };
                 }
-                if (sql.includes('DELETE FROM "Comment"')) {
-                    return { rows: [], rowCount: 1 };
+            },
+            comment: {
+                async deleteMany(args) {
+                    assert.deepEqual(args, { where: { id_comment: SAMPLE_CONTENT_ID } });
+                    return { count: 1 };
                 }
-                return { rows: [attendedRow], rowCount: 1 };
             }
-        };
-
-        const commentRepo = createReportRepository(commentPool);
-        const commentResult = await commentRepo.removeReportedContentAndAttend({
-            reportId: SAMPLE_REPORT_ID
         });
 
-        assert.deepEqual(commentResult, attendedRow);
-        assert.match(commentQueries[1].sql, /DELETE FROM "Comment"/);
-        assert.deepEqual(commentQueries[1].params, [SAMPLE_CONTENT_ID]);
+        const repository = createReportRepository(prisma);
+        await repository.removeReportedContentAndAttend({ reportId: SAMPLE_REPORT_ID });
 
-        const rollbackQueries = [];
-        let releasedOnError = false;
-        const failingPool = {
-            async connect() {
-                return {
-                    async query(sql) {
-                        rollbackQueries.push(sql);
-                        if (sql.includes('FROM "Report"')) {
-                            throw new Error("DB failure");
-                        }
-                        return { rows: [] };
-                    },
-                    release() {
-                        releasedOnError = true;
-                    }
-                };
+        assert.equal(reportUpdates[0].data.review_comment, "Earlier note");
+    });
+
+    it("removeReportedContentAndAttend returns null when the report does not exist", async () => {
+        const prisma = createFakePrisma({
+            report: {
+                async findUnique() {
+                    return null;
+                },
+                async update() {
+                    assert.fail("update must not run when the report is missing");
+                }
             }
-        };
+        });
 
-        const failingRepo = createReportRepository(failingPool);
+        const repository = createReportRepository(prisma);
+        const result = await repository.removeReportedContentAndAttend({ reportId: SAMPLE_REPORT_ID });
+
+        assert.equal(result, null);
+    });
+
+    it("removeReportedContentAndAttend propagates errors so the transaction can roll back", async () => {
+        const prisma = createFakePrisma({
+            report: {
+                async findUnique() {
+                    throw new Error("DB failure");
+                }
+            }
+        });
+
+        const repository = createReportRepository(prisma);
         await assert.rejects(
-            () => failingRepo.removeReportedContentAndAttend({ reportId: SAMPLE_REPORT_ID }),
+            () => repository.removeReportedContentAndAttend({ reportId: SAMPLE_REPORT_ID }),
             /DB failure/
         );
-        assert.equal(releasedOnError, true);
-        assert.equal(rollbackQueries[0], "BEGIN");
-        assert.equal(rollbackQueries[rollbackQueries.length - 1], "ROLLBACK");
     });
 });

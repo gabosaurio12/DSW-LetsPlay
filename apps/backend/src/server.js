@@ -23,7 +23,7 @@ function startServer() {
     const prisma = createPrismaClient();
     const videogameRepository = createVideogameRepository(prisma);
     const commentRepository = createCommentRepository(pool);
-    const reportRepository = createReportRepository(pool);
+    const reportRepository = createReportRepository(prisma);
     const lfgRepository = createLfgRepository(pool);
     const authRepository = createAuthRepository(pool);
     const gamerPreferencesRepository = createGamerPreferencesRepository(prisma);
