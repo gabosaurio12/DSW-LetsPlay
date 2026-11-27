@@ -27,9 +27,9 @@ function startServer() {
     const lfgRepository = createLfgRepository(pool);
     const authRepository = createAuthRepository(prisma);
     const gamerPreferencesRepository = createGamerPreferencesRepository(prisma);
-    const followsRepository = createFollowsRepository(pool);
-    const blocksRepository = createBlocksRepository(pool);
-    const messagesRepository = createMessagesRepository(pool);
+    const followsRepository = createFollowsRepository(prisma);
+    const blocksRepository = createBlocksRepository(prisma);
+    const messagesRepository = createMessagesRepository(prisma);
     const messageHub = createMessageHub({
         authRepository,
         allowedOrigin: resolveAllowedOrigin()

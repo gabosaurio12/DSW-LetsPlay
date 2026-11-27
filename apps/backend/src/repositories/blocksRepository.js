@@ -1,32 +1,33 @@
 const { lockUserPair } = require("./userPairLock");
 
-const FIND_ACTIVE_USER_SQL = `
-SELECT "id_user" FROM "User"
-WHERE "id_user" = $1 AND "account_status" = 'ACTIVE'
-`;
+const BLOCKED_USER_SELECT = {
+    id_user: true,
+    username: true,
+    display_name: true,
+    profile_photo_url: true
+};
 
-const LIST_BLOCKED_USERS_SQL = `
-SELECT u."id_user", u."username", u."display_name", u."profile_photo_url", b."blocked_at"
-FROM "Blocks" b
-INNER JOIN "User" u ON u."id_user" = b."id_blocked"
-WHERE b."id_blocker" = $1 AND u."account_status" = 'ACTIVE'
-ORDER BY b."blocked_at" DESC, u."id_user" ASC
-LIMIT $2 OFFSET $3
-`;
-
-const COUNT_BLOCKED_USERS_SQL = `
-SELECT count(*) FROM "Blocks" b
-INNER JOIN "User" u ON u."id_user" = b."id_blocked"
-WHERE b."id_blocker" = $1 AND u."account_status" = 'ACTIVE'
-`;
+/**
+ * Builds the filter for a relationship stored in either direction between two accounts.
+ *
+ * @param {string} firstUserId - First account uuid.
+ * @param {string} secondUserId - Second account uuid.
+ * @returns {Array<object>} Prisma OR conditions over the follower and followed columns.
+ */
+function bothDirections(firstUserId, secondUserId) {
+    return [
+        { id_follower: firstUserId, id_followed: secondUserId },
+        { id_follower: secondUserId, id_followed: firstUserId }
+    ];
+}
 
 /**
  * Creates the repository for directed blocks and their relationship cleanup.
  *
- * @param {import("pg").Pool} pool - PostgreSQL connection pool.
+ * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance.
  * @returns {object} Block repository operations.
  */
-function createBlocksRepository(pool) {
+function createBlocksRepository(prisma) {
     /**
      * Blocks an account and atomically deletes follows and requests both ways.
      *
@@ -36,42 +37,23 @@ function createBlocksRepository(pool) {
      * or null when the target is unavailable.
      */
     async function blockUser(blockerId, blockedId) {
-        const client = await pool.connect();
-        try {
-            await client.query("BEGIN");
-            await lockUserPair(client, blockerId, blockedId);
-            const target = await client.query(FIND_ACTIVE_USER_SQL, [blockedId]);
-            if (blockerId.toLowerCase() === blockedId.toLowerCase() || target.rowCount === 0) {
-                await client.query("ROLLBACK");
+        return prisma.$transaction(async (tx) => {
+            await lockUserPair(tx, blockerId, blockedId);
+            const target = await tx.user.findFirst({
+                where: { id_user: blockedId, account_status: "ACTIVE" },
+                select: { id_user: true }
+            });
+            if (blockerId.toLowerCase() === blockedId.toLowerCase() || target === null) {
                 return null;
             }
-            const inserted = await client.query(
-                `INSERT INTO "Blocks" ("id_blocker", "id_blocked")
-                 VALUES ($1::uuid, $2::uuid)
-                 ON CONFLICT ("id_blocker", "id_blocked") DO NOTHING
-                 RETURNING "id_blocker"`,
-                [blockerId, blockedId]
-            );
-            await client.query(
-                `DELETE FROM "Follows"
-                 WHERE ("id_follower" = $1 AND "id_followed" = $2)
-                    OR ("id_follower" = $2 AND "id_followed" = $1)`,
-                [blockerId, blockedId]
-            );
-            await client.query(
-                `DELETE FROM "FollowRequests"
-                 WHERE ("id_follower" = $1 AND "id_followed" = $2)
-                    OR ("id_follower" = $2 AND "id_followed" = $1)`,
-                [blockerId, blockedId]
-            );
-            await client.query("COMMIT");
-            return inserted.rowCount > 0;
-        } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-        } finally {
-            client.release();
-        }
+            const inserted = await tx.blocks.createMany({
+                data: [{ id_blocker: blockerId, id_blocked: blockedId }],
+                skipDuplicates: true
+            });
+            await tx.follows.deleteMany({ where: { OR: bothDirections(blockerId, blockedId) } });
+            await tx.followRequests.deleteMany({ where: { OR: bothDirections(blockerId, blockedId) } });
+            return inserted.count > 0;
+        });
     }
 
     /**
@@ -82,24 +64,13 @@ function createBlocksRepository(pool) {
      * @returns {Promise<boolean>} Whether a block was removed.
      */
     async function unblockUser(blockerId, blockedId) {
-        const client = await pool.connect();
-        try {
-            await client.query("BEGIN");
-            await lockUserPair(client, blockerId, blockedId);
-            const result = await client.query(
-                `DELETE FROM "Blocks"
-                 WHERE "id_blocker" = $1 AND "id_blocked" = $2
-                 RETURNING "id_blocker"`,
-                [blockerId, blockedId]
-            );
-            await client.query("COMMIT");
-            return result.rowCount > 0;
-        } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-        } finally {
-            client.release();
-        }
+        return prisma.$transaction(async (tx) => {
+            await lockUserPair(tx, blockerId, blockedId);
+            const result = await tx.blocks.deleteMany({
+                where: { id_blocker: blockerId, id_blocked: blockedId }
+            });
+            return result.count > 0;
+        });
     }
 
     /**
@@ -111,8 +82,27 @@ function createBlocksRepository(pool) {
      * @returns {Promise<Array<object>>} Blocked account profiles.
      */
     async function listBlockedUsers(blockerId, limit, offset) {
-        const result = await pool.query(LIST_BLOCKED_USERS_SQL, [blockerId, limit, offset]);
-        return result.rows;
+        const blocks = await prisma.blocks.findMany({
+            where: {
+                id_blocker: blockerId,
+                User_Blocks_id_blockedToUser: { account_status: "ACTIVE" }
+            },
+            select: {
+                blocked_at: true,
+                User_Blocks_id_blockedToUser: { select: BLOCKED_USER_SELECT }
+            },
+            orderBy: [
+                { blocked_at: "desc" },
+                { User_Blocks_id_blockedToUser: { id_user: "asc" } }
+            ],
+            skip: offset,
+            take: limit
+        });
+
+        return blocks.map((block) => ({
+            ...block.User_Blocks_id_blockedToUser,
+            blocked_at: block.blocked_at
+        }));
     }
 
     /**
@@ -122,8 +112,12 @@ function createBlocksRepository(pool) {
      * @returns {Promise<number>} Number of blocked accounts.
      */
     async function countBlockedUsers(blockerId) {
-        const result = await pool.query(COUNT_BLOCKED_USERS_SQL, [blockerId]);
-        return Number(result.rows[0].count);
+        return prisma.blocks.count({
+            where: {
+                id_blocker: blockerId,
+                User_Blocks_id_blockedToUser: { account_status: "ACTIVE" }
+            }
+        });
     }
 
     /**
@@ -134,14 +128,11 @@ function createBlocksRepository(pool) {
      * @returns {Promise<boolean>} True when the directed block exists.
      */
     async function hasBlocked(blockerId, blockedId) {
-        const result = await pool.query(
-            `SELECT EXISTS (
-                SELECT 1 FROM "Blocks"
-                WHERE "id_blocker" = $1 AND "id_blocked" = $2
-            ) AS "blocked"`,
-            [blockerId, blockedId]
-        );
-        return result.rows[0].blocked;
+        const block = await prisma.blocks.findUnique({
+            where: { id_blocker_id_blocked: { id_blocker: blockerId, id_blocked: blockedId } },
+            select: { id_blocker: true }
+        });
+        return block !== null;
     }
 
     return {

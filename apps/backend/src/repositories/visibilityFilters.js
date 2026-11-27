@@ -49,8 +49,30 @@ function buildPublicCommunityConditions() {
     ];
 }
 
+/**
+ * Checks whether a block exists between two accounts in either direction.
+ *
+ * @param {import("@prisma/client").PrismaClient|import("@prisma/client").Prisma.TransactionClient} client - Prisma client or transaction.
+ * @param {string} firstUserId - First account uuid.
+ * @param {string} secondUserId - Second account uuid.
+ * @returns {Promise<boolean>} True when either account blocked the other.
+ */
+async function isBlockedBetween(client, firstUserId, secondUserId) {
+    const block = await client.blocks.findFirst({
+        where: {
+            OR: [
+                { id_blocker: firstUserId, id_blocked: secondUserId },
+                { id_blocker: secondUserId, id_blocked: firstUserId }
+            ]
+        },
+        select: { id_blocker: true }
+    });
+    return block !== null;
+}
+
 module.exports = {
     buildVisibleAccountFilter,
     buildNotBlockedFilter,
-    buildPublicCommunityConditions
+    buildPublicCommunityConditions,
+    isBlockedBetween
 };
