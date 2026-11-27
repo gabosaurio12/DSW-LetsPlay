@@ -3,6 +3,8 @@ const { createVideogameRepository } = require("./repositories/videogameRepositor
 const { createCommentRepository } = require("./repositories/commentRepository");
 const { createReportRepository } = require("./repositories/reportRepository");
 const { createLfgRepository } = require("./repositories/lfgRepository");
+const { createAuthRepository } = require("./repositories/authRepository");
+const { createGamerPreferencesRepository } = require("./repositories/gamerPreferencesRepository");
 const { createApp } = require("./app");
 
 /**
@@ -17,7 +19,16 @@ function startServer() {
     const commentRepository = createCommentRepository(pool);
     const reportRepository = createReportRepository(pool);
     const lfgRepository = createLfgRepository(pool);
-    const app = createApp({ videogameRepository, commentRepository, reportRepository, lfgRepository });
+    const authRepository = createAuthRepository(pool);
+    const gamerPreferencesRepository = createGamerPreferencesRepository(pool);
+    const app = createApp({
+        videogameRepository,
+        commentRepository,
+        reportRepository,
+        lfgRepository,
+        authRepository,
+        gamerPreferencesRepository
+    });
 
     return app.listen(port, () => {
         console.log(`Backend server listening on port ${port}`);

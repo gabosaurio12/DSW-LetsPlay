@@ -7,8 +7,7 @@ import LfgSearch from "./pages/LfgSearch.jsx";
 import ModerationPanel from "./pages/ModerationPanel.jsx";
 import LoginForm from "./components/LoginForm.jsx";
 import RegisterForm from "./components/RegisterForm.jsx";
-import RecoveryForm from "./components/RecoveryForm.jsx";
-import { getCurrentUser, logout } from "./services/authService.js";
+import { fetchCurrentUser, logout } from "./services/authService.js";
 import ProfileForm from "./ProfileForm.jsx";
 import WelcomeSurvey from "./WelcomeSurvey.jsx";
 import { loadWelcomeSurvey } from "./services/welcomeSurveyService.js";
@@ -22,6 +21,9 @@ const VIEWS = {
 };
 
 const ADMIN_ROUTES = new Set(["/admin", "/admin/moderation"]);
+
+const SURVEY_CHECK_FAILED = "failed";
+const UNAUTHORIZED_STATUS = 401;
 
 const LIBRARY_STORAGE_KEY = "letsPlay.gameLibrary";
 
@@ -99,10 +101,12 @@ function saveLibraryGames(games) {
  */
 function App() {
     const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
-    const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+    // Undefined while the session is checked with the server, null when signed out.
+    const [currentUser, setCurrentUser] = useState(undefined);
     const [authView, setAuthView] = useState("login");
-    // Null until the stored survey answers of the session are read.
+    // Null until the saved preferences of the account are read; SURVEY_CHECK_FAILED on error.
     const [surveyCompleted, setSurveyCompleted] = useState(null);
+    const [surveyRetryCount, setSurveyRetryCount] = useState(0);
     const [isAdminRoute, setIsAdminRoute] = useState(() =>
         isAdminPathname(window.location.pathname)
     );
@@ -123,21 +127,54 @@ function App() {
     }, []);
 
     useEffect(() => {
+        let isActive = true;
+        const restoreSession = async () => {
+            try {
+                const user = await fetchCurrentUser();
+                if (isActive) {
+                    setCurrentUser(user);
+                }
+            } catch (error) {
+                console.error("App.restoreSession", error);
+                if (isActive) {
+                    setCurrentUser(null);
+                }
+            }
+        };
+        restoreSession();
+        return () => {
+            isActive = false;
+        };
+    }, []);
+
+    useEffect(() => {
         if (!currentUser) {
             return undefined;
         }
         let isActive = true;
         const checkSurveyCompletion = async () => {
-            const storedSelection = await loadWelcomeSurvey();
-            if (isActive) {
-                setSurveyCompleted(storedSelection !== null);
+            try {
+                const savedSelection = await loadWelcomeSurvey();
+                if (isActive) {
+                    setSurveyCompleted(savedSelection !== null);
+                }
+            } catch (error) {
+                console.error("App.checkSurveyCompletion", error);
+                if (!isActive) {
+                    return;
+                }
+                if (error.status === UNAUTHORIZED_STATUS) {
+                    setCurrentUser(null);
+                    return;
+                }
+                setSurveyCompleted(SURVEY_CHECK_FAILED);
             }
         };
         checkSurveyCompletion();
         return () => {
             isActive = false;
         };
-    }, [currentUser]);
+    }, [currentUser, surveyRetryCount]);
 
     function handleLoginSuccess(user) {
         setCurrentUser(user);
@@ -147,13 +184,22 @@ function App() {
         setSurveyCompleted(true);
     }
 
-    async function handleLogout() {
-        await logout();
+    function handleRetrySurveyCheck() {
+        setSurveyCompleted(null);
+        setSurveyRetryCount((count) => count + 1);
+    }
+
+    function handleSessionExpired() {
         setCurrentUser(null);
         setSurveyCompleted(null);
         setAuthView("login");
         setActiveView(VIEWS.EXPLORE);
         setSelectedGameId(null);
+    }
+
+    async function handleLogout() {
+        await logout();
+        handleSessionExpired();
     }
 
     function handleSelectView(view) {
@@ -259,12 +305,17 @@ function App() {
                         onLoginSuccess={handleLoginSuccess}
                     />
                 )}
-                {authView === "recovery" && (
-                    <RecoveryForm
-                        translate={translate}
-                        onNavigate={setAuthView}
-                    />
-                )}
+            </div>
+        );
+    }
+
+    function renderSurveyCheckError() {
+        return (
+            <div className="auth-card-wrapper">
+                <p className="survey-error" role="alert">{translate("survey.errors.load")}</p>
+                <button type="button" className="survey-submit" onClick={handleRetrySurveyCheck}>
+                    {translate("survey.actions.retry")}
+                </button>
             </div>
         );
     }
@@ -290,7 +341,7 @@ function App() {
 
     function renderWorkspaceContent() {
         if (activeView === VIEWS.PROFILE) {
-            return <ProfileForm language={language} />;
+            return <ProfileForm language={language} onSessionExpired={handleSessionExpired} />;
         }
         if (activeView === VIEWS.LFG) {
             return (
@@ -324,16 +375,25 @@ function App() {
         );
     }
 
+    if (currentUser === undefined) {
+        return renderGateLayout(null);
+    }
     if (!currentUser) {
         return renderGateLayout(renderAuthView());
     }
     if (surveyCompleted === null) {
-        // The stored answers are read asynchronously before choosing a view.
         return renderGateLayout(null);
+    }
+    if (surveyCompleted === SURVEY_CHECK_FAILED) {
+        return renderGateLayout(renderSurveyCheckError());
     }
     if (!surveyCompleted) {
         return renderGateLayout(
-            <WelcomeSurvey language={language} onCompleted={handleSurveyCompleted} />
+            <WelcomeSurvey
+                language={language}
+                onCompleted={handleSurveyCompleted}
+                onSessionExpired={handleSessionExpired}
+            />
         );
     }
 
