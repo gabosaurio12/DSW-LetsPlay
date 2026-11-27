@@ -69,6 +69,19 @@ WHERE p."id_videogame" = $1
   AND p."status" = 'ACTIVE'
   AND u."account_status" = 'ACTIVE'
   AND (
+    NOT u."is_private"
+    OR u."id_user" = $2
+    OR EXISTS (
+      SELECT 1 FROM "Follows" f
+      WHERE f."id_follower" = $2 AND f."id_followed" = u."id_user"
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM "Blocks" b
+    WHERE (b."id_blocker" = u."id_user" AND b."id_blocked" = $2)
+       OR (b."id_blocker" = $2 AND b."id_blocked" = u."id_user")
+  )
+  AND (
       p."id_community" IS NULL
       OR EXISTS (
           SELECT 1
@@ -88,10 +101,31 @@ SELECT cm."id_comment", cm."id_post", cm."content", cm."is_spoiler", cm."created
        u."display_name" AS "author_display_name"
 FROM "Comment" cm
 INNER JOIN "User" u ON u."id_user" = cm."id_user"
-INNER JOIN "Post" p ON p."id_post" = cm."id_post"
+ INNER JOIN "Post" p ON p."id_post" = cm."id_post"
 WHERE cm."id_post" = $1
   AND u."account_status" = 'ACTIVE'
   AND p."status" = 'ACTIVE'
+  AND (
+    NOT EXISTS (
+      SELECT 1 FROM "User" owner
+      WHERE owner."id_user" = p."id_user" AND owner."is_private"
+    )
+    OR p."id_user" = $2
+    OR EXISTS (
+      SELECT 1 FROM "Follows" f
+      WHERE f."id_follower" = $2 AND f."id_followed" = p."id_user"
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM "Blocks" b
+    WHERE (b."id_blocker" = p."id_user" AND b."id_blocked" = $2)
+       OR (b."id_blocker" = $2 AND b."id_blocked" = p."id_user")
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM "Blocks" b
+    WHERE (b."id_blocker" = cm."id_user" AND b."id_blocked" = $2)
+       OR (b."id_blocker" = $2 AND b."id_blocked" = cm."id_user")
+  )
   AND (
       p."id_community" IS NULL
       OR EXISTS (
@@ -219,10 +253,11 @@ function createVideogameRepository(pool) {
      * Finds public posts for a videogame with author info, reaction count and comment count.
      *
      * @param {string} id - Videogame UUID.
+     * @param {string} viewerId - Current account UUID.
      * @returns {Promise<Array<object>>} Public posts ordered by newest first.
      */
-    async function findPublicPostsByVideogameId(id) {
-        const result = await pool.query(FIND_PUBLIC_POSTS_BY_VIDEOGAME_ID_SQL, [id]);
+    async function findPublicPostsByVideogameId(id, viewerId) {
+        const result = await pool.query(FIND_PUBLIC_POSTS_BY_VIDEOGAME_ID_SQL, [id, viewerId]);
         return result.rows;
     }
 
@@ -230,10 +265,11 @@ function createVideogameRepository(pool) {
      * Finds comments for an active public post ordered chronologically.
      *
      * @param {string} postId - Post UUID.
+     * @param {string} viewerId - Current account UUID.
      * @returns {Promise<Array<object>>} Post comments ordered oldest first.
      */
-    async function findCommentsByPostId(postId) {
-        const result = await pool.query(FIND_COMMENTS_BY_POST_ID_SQL, [postId]);
+    async function findCommentsByPostId(postId, viewerId) {
+        const result = await pool.query(FIND_COMMENTS_BY_POST_ID_SQL, [postId, viewerId]);
         return result.rows;
     }
 

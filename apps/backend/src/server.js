@@ -6,6 +6,7 @@ const { createLfgRepository } = require("./repositories/lfgRepository");
 const { createAuthRepository } = require("./repositories/authRepository");
 const { createGamerPreferencesRepository } = require("./repositories/gamerPreferencesRepository");
 const { createFollowsRepository } = require("./repositories/followsRepository");
+const { createBlocksRepository } = require("./repositories/blocksRepository");
 const { createApp } = require("./app");
 
 /**
@@ -23,6 +24,7 @@ function startServer() {
     const authRepository = createAuthRepository(pool);
     const gamerPreferencesRepository = createGamerPreferencesRepository(pool);
     const followsRepository = createFollowsRepository(pool);
+    const blocksRepository = createBlocksRepository(pool);
     const app = createApp({
         videogameRepository,
         commentRepository,
@@ -30,7 +32,8 @@ function startServer() {
         lfgRepository,
         authRepository,
         gamerPreferencesRepository,
-        followsRepository
+        followsRepository,
+        blocksRepository
     });
 
     return app.listen(port, () => {

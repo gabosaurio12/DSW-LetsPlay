@@ -33,15 +33,36 @@ function createMockFollowsRepository(overrides = {}) {
         async findFollowState() {
             return overrides.following === true;
         },
+        async findConnectionState() {
+            return overrides.connectionState || (overrides.following ? "following" : "none");
+        },
         async findFollowStates() {
             return overrides.followedIds || [];
+        },
+        async findPendingStates() {
+            return overrides.pendingIds || [];
+        },
+        async findPrivacy() {
+            return false;
+        },
+        async updatePrivacy(_userId, isPrivate) {
+            return isPrivate;
+        },
+        async listIncomingRequests() {
+            return [];
+        },
+        async countIncomingRequests() {
+            return 0;
+        },
+        async resolveFollowRequest() {
+            return true;
         },
         async countFollows() {
             return { followers: 128, following: 64 };
         },
         async addFollow(followerId, followedId) {
             calls.added.push({ followerId, followedId });
-            return overrides.insertFailed !== true;
+            return overrides.insertFailed === true ? null : "following";
         },
         async removeFollow(followerId, followedId) {
             calls.removed.push({ followerId, followedId });
@@ -106,8 +127,10 @@ describe("followsRouter", () => {
             assert.equal(response.status, 200);
             assert.deepEqual(body, {
                 user: USER,
-                isFollowing: true,
-                counts: { followers: 128, following: 64 }
+                connectionState: "following",
+                isFollowedBy: true,
+                counts: { followers: 128, following: 64 },
+                canViewConnections: true
             });
         });
     });
@@ -150,7 +173,7 @@ describe("followsRouter", () => {
             });
             const body = await response.json();
             assert.equal(response.status, 200);
-            assert.deepEqual(body, { isFollowing: true });
+            assert.deepEqual(body, { connectionState: "following" });
             assert.deepEqual(repository.calls.added, [
                 { followerId: VIEWER_ID, followedId: OTHER_ID }
             ]);
@@ -164,7 +187,7 @@ describe("followsRouter", () => {
                 method: "PUT"
             });
             assert.equal(response.status, 200);
-            assert.equal(repository.calls.added.length, 0);
+            assert.equal(repository.calls.added.length, 1);
         });
     });
 
@@ -186,7 +209,7 @@ describe("followsRouter", () => {
             });
             const body = await response.json();
             assert.equal(response.status, 200);
-            assert.deepEqual(body, { isFollowing: false });
+            assert.deepEqual(body, { connectionState: "none" });
             assert.deepEqual(repository.calls.removed, [
                 { followerId: VIEWER_ID, followedId: OTHER_ID }
             ]);
@@ -200,7 +223,7 @@ describe("followsRouter", () => {
             const response = await request(baseUrl, path);
             const body = await response.json();
             assert.equal(response.status, 200);
-            assert.deepEqual(body, { followedIds: [OTHER_ID] });
+            assert.deepEqual(body, { followedIds: [OTHER_ID], pendingIds: [] });
         });
     });
 

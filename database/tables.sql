@@ -93,6 +93,7 @@ CREATE TABLE "User" (
   "display_name" varchar(100),
   "description" text,
   "profile_photo_url" varchar(500),
+  "is_private" boolean NOT NULL DEFAULT false,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz,
   "account_status" account_status NOT NULL,
@@ -135,6 +136,19 @@ CREATE TABLE "Follows" (
   PRIMARY KEY ("id_follower", "id_followed"),
   CONSTRAINT "chk_follows_no_self" CHECK ("id_follower" <> "id_followed")
 );
+
+CREATE TABLE "FollowRequests" (
+  "id_follower" uuid NOT NULL,
+  "id_followed" uuid NOT NULL,
+  "requested_at" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("id_follower", "id_followed"),
+  CONSTRAINT "chk_follow_requests_no_self" CHECK ("id_follower" <> "id_followed")
+);
+
+CREATE INDEX "idx_follows_id_followed" ON "Follows" ("id_followed");
+
+CREATE INDEX "idx_follow_requests_followed_requested_at"
+ON "FollowRequests" ("id_followed", "requested_at");
 
 CREATE TABLE "Blocks" (
   "id_blocker" uuid,
@@ -378,6 +392,10 @@ ALTER TABLE "UserVideogames" ADD FOREIGN KEY ("id_videogame") REFERENCES "Videog
 ALTER TABLE "Follows" ADD FOREIGN KEY ("id_follower") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "Follows" ADD FOREIGN KEY ("id_followed") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "FollowRequests" ADD FOREIGN KEY ("id_follower") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "FollowRequests" ADD FOREIGN KEY ("id_followed") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "Blocks" ADD FOREIGN KEY ("id_blocker") REFERENCES "User" ("id_user") DEFERRABLE INITIALLY IMMEDIATE;
 

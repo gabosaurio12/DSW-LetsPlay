@@ -3,9 +3,12 @@ import { useTranslation } from "../hooks/useTranslation.js";
 import FollowListModal from "../components/FollowListModal.jsx";
 import {
     fetchUserProfile,
+    fetchBlockState,
     followUser,
+    blockUser,
     getProfileInitials,
-    unfollowUser
+    unfollowUser,
+    unblockUser
 } from "../services/followService.js";
 import "./UserProfile.css";
 
@@ -35,25 +38,37 @@ function UserProfile({
     const translate = useTranslation(language);
     const [profile, setProfile] = useState(null);
     const [isFollowing, setIsFollowing] = useState(false);
+    const [connectionState, setConnectionState] = useState("none");
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [isFollowedBy, setIsFollowedBy] = useState(false);
     const [counts, setCounts] = useState({ followers: 0, following: 0 });
+    const [canViewConnections, setCanViewConnections] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [errorKey, setErrorKey] = useState(null);
     const [isUpdating, setIsUpdating] = useState(false);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
+    const [showBlockConfirm, setShowBlockConfirm] = useState(false);
     const [openList, setOpenList] = useState(null);
 
     useEffect(() => {
         let isActive = true;
         const controller = new AbortController();
 
-        fetchUserProfile(userId, { signal: controller.signal })
-            .then((data) => {
+        Promise.all([
+            fetchUserProfile(userId, { signal: controller.signal }),
+            fetchBlockState(userId, { signal: controller.signal })
+        ])
+            .then(([data, blockState]) => {
                 if (!isActive) {
                     return;
                 }
                 setProfile(data.user);
-                setIsFollowing(data.isFollowing);
+                setConnectionState(data.connectionState || "none");
+                setIsFollowing(data.connectionState === "following");
+                setIsFollowedBy(data.isFollowedBy);
+                setIsBlocked(blockState.isBlocked);
                 setCounts(data.counts || { followers: 0, following: 0 });
+                setCanViewConnections(data.canViewConnections !== false);
                 setIsLoading(false);
             })
             .catch((error) => {
@@ -80,9 +95,12 @@ function UserProfile({
         setIsUpdating(true);
         setErrorKey(null);
         try {
-            await followUser(userId);
-            setIsFollowing(true);
-            setCounts((prev) => ({ ...prev, followers: prev.followers + 1 }));
+            const result = await followUser(userId);
+            setConnectionState(result.connectionState);
+            setIsFollowing(result.connectionState === "following");
+            if (result.connectionState === "following") {
+                setCounts((prev) => ({ ...prev, followers: prev.followers + 1 }));
+            }
         } catch (error) {
             handleFollowError(error);
         } finally {
@@ -96,11 +114,46 @@ function UserProfile({
         try {
             await unfollowUser(userId);
             setIsFollowing(false);
-            setCounts((prev) => ({
-                ...prev,
-                followers: Math.max(0, prev.followers - 1)
-            }));
+            const wasFollowing = connectionState === "following";
+            setConnectionState("none");
+            if (wasFollowing) {
+                setCounts((prev) => ({
+                    ...prev,
+                    followers: Math.max(0, prev.followers - 1)
+                }));
+            }
             setShowUnfollowConfirm(false);
+        } catch (error) {
+            handleFollowError(error);
+        } finally {
+            setIsUpdating(false);
+        }
+    }
+
+    async function confirmBlockToggle() {
+        setIsUpdating(true);
+        setErrorKey(null);
+        try {
+            if (isBlocked) {
+                await unblockUser(userId);
+                setIsBlocked(false);
+            } else {
+                await blockUser(userId);
+                setIsBlocked(true);
+                setIsFollowing(false);
+                setConnectionState("none");
+                setCounts((previous) => {
+                    const next = { ...previous };
+                    if (isFollowing) {
+                        next.followers = Math.max(0, next.followers - 1);
+                    }
+                    if (isFollowedBy) {
+                        next.following = Math.max(0, next.following - 1);
+                    }
+                    return next;
+                });
+            }
+            setShowBlockConfirm(false);
         } catch (error) {
             handleFollowError(error);
         } finally {
@@ -151,23 +204,27 @@ function UserProfile({
                         {getProfileInitials(displayName)}
                     </div>
                     <div className="user-profile-actions">
-                        <button
-                            type="button"
-                            className="user-profile-message"
-                            disabled
-                            title={translate("follows.states.comingSoon")}
-                        >
-                            {translate("follows.messageSoon")}
-                        </button>
                         {!isSelf && (
-                            isFollowing ? (
+                            <button
+                                type="button"
+                                className="user-profile-block"
+                                disabled={isUpdating}
+                                onClick={() => setShowBlockConfirm((value) => !value)}
+                            >
+                                {translate(isBlocked ? "privacy.unblock" : "privacy.block")}
+                            </button>
+                        )}
+                        {!isSelf && (
+                            isFollowing || connectionState === "pending" ? (
                                 <button
                                     type="button"
                                     className="user-profile-follow user-profile-follow--active"
                                     disabled={isUpdating}
                                     onClick={() => setShowUnfollowConfirm((value) => !value)}
                                 >
-                                    {translate("follows.following")}
+                                    {translate(connectionState === "pending"
+                                        ? "follows.requested"
+                                        : "follows.following")}
                                 </button>
                             ) : (
                                 <button
@@ -180,22 +237,41 @@ function UserProfile({
                                 </button>
                             )
                         )}
+                        <button
+                            type="button"
+                            className="user-profile-message"
+                            disabled
+                            title={translate("follows.states.comingSoon")}
+                        >
+                            {translate("follows.messageSoon")}
+                        </button>
                     </div>
                 </div>
 
                 <div className="user-profile-info">
                     <h1 className="user-profile-name">{displayName}</h1>
                     <p className="user-profile-handle">@{profile.username}</p>
+                    {profile.is_private && connectionState !== "following" && (
+                        <p className="user-profile-private-label">
+                            {translate("privacy.privateProfile")}
+                        </p>
+                    )}
                     <div className="user-profile-counts">
-                        <button
-                            type="button"
-                            onClick={() => setOpenList("followers")}
-                        >
-                            {translate("follows.counts", {
-                                followers: counts.followers,
-                                following: counts.following
-                            })}
-                        </button>
+                        {canViewConnections ? (
+                            <button
+                                type="button"
+                                onClick={() => setOpenList("followers")}
+                            >
+                                {translate("follows.counts", {
+                                    followers: counts.followers,
+                                    following: counts.following
+                                })}
+                            </button>
+                        ) : (
+                            <span className="user-profile-private-counts">
+                                {translate("privacy.connectionsPrivate")}
+                            </span>
+                        )}
                     </div>
                     {errorKey !== null && (
                         <p className="user-profile-error" role="alert">{translate(errorKey)}</p>
@@ -203,7 +279,12 @@ function UserProfile({
                     {showUnfollowConfirm && (
                         <div className="user-profile-confirm">
                             <span>
-                                {translate("follows.confirmUnfollow", { name: displayName })}
+                                {translate(
+                                    connectionState === "pending"
+                                        ? "follows.confirmCancelRequest"
+                                        : "follows.confirmUnfollow",
+                                    { name: displayName }
+                                )}
                             </span>
                             <button
                                 type="button"
@@ -211,13 +292,41 @@ function UserProfile({
                                 disabled={isUpdating}
                                 onClick={handleUnfollow}
                             >
-                                {translate("follows.confirmAction")}
+                                {translate(connectionState === "pending"
+                                    ? "follows.cancelRequest"
+                                    : "follows.confirmAction")}
                             </button>
                             <button
                                 type="button"
                                 className="user-profile-cancel"
                                 disabled={isUpdating}
                                 onClick={() => setShowUnfollowConfirm(false)}
+                            >
+                                {translate("follows.confirmCancel")}
+                            </button>
+                        </div>
+                    )}
+                    {showBlockConfirm && (
+                        <div className="user-profile-confirm">
+                            <span>
+                                {translate(
+                                    isBlocked ? "privacy.confirmUnblock" : "privacy.confirmBlock",
+                                    { name: displayName }
+                                )}
+                            </span>
+                            <button
+                                type="button"
+                                className="user-profile-block"
+                                disabled={isUpdating}
+                                onClick={confirmBlockToggle}
+                            >
+                                {translate(isBlocked ? "privacy.unblock" : "privacy.block")}
+                            </button>
+                            <button
+                                type="button"
+                                className="user-profile-cancel"
+                                disabled={isUpdating}
+                                onClick={() => setShowBlockConfirm(false)}
                             >
                                 {translate("follows.confirmCancel")}
                             </button>

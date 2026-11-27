@@ -67,7 +67,8 @@
 
 .user-profile-message,
 .user-profile-follow,
-.user-profile-cancel {
+.user-profile-cancel,
+.user-profile-block {
     padding: 10px 18px;
     border: 1px solid var(--lp-border);
     border-radius: 999px;
@@ -76,6 +77,11 @@
     cursor: pointer;
     font-family: var(--lp-font-display);
     font-size: 13px;
+}
+
+.user-profile-block {
+    background: var(--lp-surface);
+    color: var(--lp-primary);
 }
 
 .user-profile-follow {
@@ -112,6 +118,12 @@
     margin: 4px 0 0;
     color: var(--lp-text-secondary);
     font-size: 14px;
+}
+
+.user-profile-private-label {
+    margin: 8px 0 0;
+    color: var(--lp-text-secondary);
+    font-size: 13px;
 }
 
 .user-profile-counts {

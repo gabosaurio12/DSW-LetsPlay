@@ -44,6 +44,52 @@ function createFollowsRouter(authRepository, followsRepository) {
 
     router.use(requireSession);
 
+    router.get("/me/follow-requests", async (req, res, next) => {
+        try {
+            const pagination = parsePagination(req.query);
+            if (pagination === null) {
+                res.status(400).json({ error: "Invalid pagination" });
+                return;
+            }
+            const userId = currentUserId(req);
+            const [users, total] = await Promise.all([
+                followsRepository.listIncomingRequests(
+                    userId,
+                    pagination.limit,
+                    pagination.offset
+                ),
+                followsRepository.countIncomingRequests(userId)
+            ]);
+            res.status(200).json({ users, total, ...pagination });
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    router.patch("/me/follow-requests/:requesterId", async (req, res, next) => {
+        try {
+            const { requesterId } = req.params;
+            const { action } = req.body || {};
+            if (!UUID_REGEX.test(requesterId)
+                || (action !== "accept" && action !== "reject")) {
+                res.status(400).json({ error: "Invalid follow request action" });
+                return;
+            }
+            const resolved = await followsRepository.resolveFollowRequest(
+                currentUserId(req),
+                requesterId,
+                action
+            );
+            if (!resolved) {
+                res.status(404).json({ error: "Follow request not found" });
+                return;
+            }
+            res.status(200).json({ action, resolved: true });
+        } catch (error) {
+            next(error);
+        }
+    });
+
     router.get("/follow-states", async (req, res, next) => {
         try {
             const { ids } = req.query;
@@ -56,11 +102,11 @@ function createFollowsRouter(authRepository, followsRepository) {
                 res.status(400).json({ error: "Invalid user ids" });
                 return;
             }
-            const followedIds = await followsRepository.findFollowStates(
-                currentUserId(req),
-                userIds
-            );
-            res.status(200).json({ followedIds });
+            const [followedIds, pendingIds] = await Promise.all([
+                followsRepository.findFollowStates(currentUserId(req), userIds),
+                followsRepository.findPendingStates(currentUserId(req), userIds)
+            ]);
+            res.status(200).json({ followedIds, pendingIds });
         } catch (error) {
             next(error);
         }
@@ -78,11 +124,23 @@ function createFollowsRouter(authRepository, followsRepository) {
                 res.status(404).json({ error: "User not found" });
                 return;
             }
-            const [counts, isFollowing] = await Promise.all([
+            const [counts, connectionState, isFollowedBy] = await Promise.all([
                 followsRepository.countFollows(userId, currentUserId(req)),
-                followsRepository.findFollowState(currentUserId(req), userId)
+                followsRepository.findConnectionState(currentUserId(req), userId),
+                followsRepository.findFollowState(userId, currentUserId(req))
             ]);
-            res.status(200).json({ user, isFollowing, counts });
+            const canViewConnections = !user.is_private
+                || userId === currentUserId(req)
+                || connectionState === "following";
+            res.status(200).json({
+                user: canViewConnections
+                    ? user
+                    : { ...user, description: null },
+                connectionState,
+                isFollowedBy,
+                counts: canViewConnections ? counts : null,
+                canViewConnections
+            });
         } catch (error) {
             next(error);
         }
@@ -96,7 +154,7 @@ function createFollowsRouter(authRepository, followsRepository) {
                 res.status(400).json({ error: "Invalid user id" });
                 return;
             }
-            if (userId === viewerId) {
+            if (userId.toLowerCase() === viewerId.toLowerCase()) {
                 res.status(400).json({ error: "A user cannot follow themselves" });
                 return;
             }
@@ -105,15 +163,12 @@ function createFollowsRouter(authRepository, followsRepository) {
                 res.status(404).json({ error: "User not found" });
                 return;
             }
-            const alreadyFollowing = await followsRepository.findFollowState(viewerId, userId);
-            if (!alreadyFollowing) {
-                const inserted = await followsRepository.addFollow(viewerId, userId);
-                if (!inserted) {
-                    res.status(404).json({ error: "User not found" });
-                    return;
-                }
+            const connectionState = await followsRepository.addFollow(viewerId, userId);
+            if (connectionState === null) {
+                res.status(404).json({ error: "User not found" });
+                return;
             }
-            res.status(200).json({ isFollowing: true });
+            res.status(200).json({ connectionState });
         } catch (error) {
             next(error);
         }
@@ -127,7 +182,7 @@ function createFollowsRouter(authRepository, followsRepository) {
                 return;
             }
             await followsRepository.removeFollow(currentUserId(req), userId);
-            res.status(200).json({ isFollowing: false });
+            res.status(200).json({ connectionState: "none" });
         } catch (error) {
             next(error);
         }
@@ -148,6 +203,12 @@ function createFollowsRouter(authRepository, followsRepository) {
         const user = await followsRepository.findVisibleUser(userId, viewerId);
         if (user === null) {
             res.status(404).json({ error: "User not found" });
+            return;
+        }
+        if (user.is_private
+            && userId !== viewerId
+            && await followsRepository.findConnectionState(viewerId, userId) !== "following") {
+            res.status(403).json({ error: "Connections are private" });
             return;
         }
         const listArgs = [userId, viewerId, pagination.limit, pagination.offset];
