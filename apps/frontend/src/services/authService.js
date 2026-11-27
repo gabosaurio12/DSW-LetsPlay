@@ -1,193 +1,99 @@
-const STORAGE_KEY_CURRENT_USER = "letsPlay.currentUser";
-const STORAGE_KEY_REGISTERED_USERS = "letsPlay.registeredUsers";
+const AUTH_API_PATH = "/api/auth";
+const NO_CONTENT_STATUS = 204;
+const UNAUTHORIZED_STATUS = 401;
+const SERVICE_UNAVAILABLE_KEY = "serviceUnavailable";
 
 /**
- * Default mock user to allow instant testing without prior registration.
- */
-const DEFAULT_USERS = [
-  {
-    id: "usr-001",
-    username: "seth_play",
-    email: "correo@ejemplo.com",
-    password: "password123",
-    birthDate: "2000-01-01",
-    gender: "male",
-  },
-];
-
-/**
- * Loads registered users from local storage, falling back to default seed users.
+ * Sends a JSON request to the auth API.
  *
- * @returns {Array<Object>} List of users stored locally.
+ * @param {string} path - Endpoint path relative to the auth API.
+ * @param {{ method?: string, body?: Object }} [options] - Request method and optional JSON body.
+ * @returns {Promise<{ status: number, payload: Object|null }>} HTTP status and parsed body.
+ * @throws {TypeError} When the network request fails.
  */
-function getStoredUsers() {
-  try {
-    const rawData = window.localStorage.getItem(STORAGE_KEY_REGISTERED_USERS);
-    if (!rawData) {
-      window.localStorage.setItem(STORAGE_KEY_REGISTERED_USERS, JSON.stringify(DEFAULT_USERS));
-      return DEFAULT_USERS;
-    }
-    const parsed = JSON.parse(rawData);
-    return Array.isArray(parsed) ? parsed : DEFAULT_USERS;
-  } catch {
-    // If local storage is disabled or corrupted, fall back to in-memory defaults.
-    return DEFAULT_USERS;
-  }
+async function requestAuth(path, { method = "GET", body } = {}) {
+  const response = await fetch(`${AUTH_API_PATH}${path}`, {
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const payload = response.status === NO_CONTENT_STATUS ? null : await response.json();
+  return { status: response.status, payload };
 }
 
 /**
- * Saves the updated list of users to local storage.
+ * Reads the account of the current session from the server.
  *
- * @param {Array<Object>} users - The list of users to persist.
+ * @returns {Promise<Object|null>} The session user, or null when there is no valid session.
+ * @throws {Error} When the server cannot be reached or answers with an unexpected status.
  */
-function saveStoredUsers(users) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY_REGISTERED_USERS, JSON.stringify(users));
-  } catch {
-    // Gracefully handle storage errors (e.g. quota exceeded or incognito mode).
-  }
-}
-
-/**
- * Retrieves the currently authenticated user from local storage.
- *
- * @returns {Object|null} The active user session, or null if logged out.
- */
-export function getCurrentUser() {
-  try {
-    const rawData = window.localStorage.getItem(STORAGE_KEY_CURRENT_USER);
-    if (!rawData) {
-      return null;
-    }
-    const user = JSON.parse(rawData);
-    return user && typeof user === "object" && user.username ? user : null;
-  } catch {
+export async function fetchCurrentUser() {
+  const { status, payload } = await requestAuth("/session");
+  if (status === UNAUTHORIZED_STATUS) {
     return null;
   }
+  if (status !== 200) {
+    throw new Error(`Failed to read session (${status})`);
+  }
+  return payload.user;
 }
 
 /**
- * Authenticates a user against local records by email or username.
+ * Authenticates an account by username or email. The server sets the session cookie.
  *
- * @param {string} identifier - Email or username.
- * @param {string} password - Raw password entered by user.
+ * @param {string} identifier - Username or email.
+ * @param {string} password - Raw password entered by the user.
  * @returns {Promise<{ success: boolean, user?: Object, errorKey?: string }>} Result of login.
  */
 export async function login(identifier, password) {
-  const users = getStoredUsers();
-  const trimmedId = identifier.trim().toLowerCase();
-
-  const user = users.find((u) => {
-    const matchUsername = u.username.toLowerCase() === trimmedId;
-    const matchEmail = u.email.toLowerCase() === trimmedId;
-    return (matchUsername || matchEmail) && u.password === password;
-  });
-
-  if (!user) {
-    return { success: false, errorKey: "invalidCredentials" };
-  }
-
-  // Sanitize password before writing to session state.
-  const sessionUser = {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    birthDate: user.birthDate,
-    gender: user.gender,
-  };
-
   try {
-    window.localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(sessionUser));
-  } catch {
-    // Storage issue, but login can still succeed in memory.
+    const { status, payload } = await requestAuth("/login", {
+      method: "POST",
+      body: { identifier, password },
+    });
+    if (status === 200) {
+      return { success: true, user: payload.user };
+    }
+    return { success: false, errorKey: payload.errorKey || SERVICE_UNAVAILABLE_KEY };
+  } catch (error) {
+    console.error("authService.login", error);
+    return { success: false, errorKey: SERVICE_UNAVAILABLE_KEY };
   }
-
-  return { success: true, user: sessionUser };
 }
 
 /**
- * Registers a new user account and starts their active session.
+ * Registers a new account and starts its session. The server sets the session cookie.
  *
- * @param {Object} userData - Registration fields.
+ * @param {Object} userData - Registration fields: username, email, birthDate, gender and password.
  * @returns {Promise<{ success: boolean, user?: Object, errorKey?: string }>} Result of registration.
  */
 export async function register(userData) {
-  const users = getStoredUsers();
-  const cleanUsername = userData.username.trim();
-  const cleanEmail = userData.email.trim().toLowerCase();
-
-  const exists = users.some((u) => (
-    u.username.toLowerCase() === cleanUsername.toLowerCase()
-    || u.email.toLowerCase() === cleanEmail
-  ));
-
-  if (exists) {
-    return { success: false, errorKey: "userExists" };
-  }
-
-  const newUser = {
-    id: `usr-${Date.now()}`,
-    username: cleanUsername,
-    email: cleanEmail,
-    birthDate: userData.birthDate,
-    gender: userData.gender,
-    password: userData.password,
-  };
-
-  users.push(newUser);
-  saveStoredUsers(users);
-
-  const sessionUser = {
-    id: newUser.id,
-    username: newUser.username,
-    email: newUser.email,
-    birthDate: newUser.birthDate,
-    gender: newUser.gender,
-  };
-
   try {
-    window.localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(sessionUser));
-  } catch {
-    // Fallback if local storage fails.
+    const { status, payload } = await requestAuth("/register", {
+      method: "POST",
+      body: userData,
+    });
+    if (status === 201) {
+      return { success: true, user: payload.user };
+    }
+    return { success: false, errorKey: payload.errorKey || SERVICE_UNAVAILABLE_KEY };
+  } catch (error) {
+    console.error("authService.register", error);
+    return { success: false, errorKey: SERVICE_UNAVAILABLE_KEY };
   }
-
-  return { success: true, user: sessionUser };
 }
 
 /**
- * Clears the active session from local storage to log out.
+ * Ends the current session on the server and clears its cookie.
+ * The local state is cleared by the caller even when the request fails.
  *
  * @returns {Promise<boolean>} Always resolves to true.
  */
 export async function logout() {
   try {
-    window.localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
-  } catch {
-    // Storage removal error can be ignored safely.
+    await requestAuth("/logout", { method: "POST" });
+  } catch (error) {
+    console.error("authService.logout", error);
   }
   return true;
-}
-
-/**
- * Resets a user's password when given a valid email and 6-digit verification code.
- *
- * @param {string} email - Account email.
- * @param {string} code - Verification code (mocked as 6 digits).
- * @param {string} newPassword - New password to set.
- * @returns {Promise<{ success: boolean, errorKey?: string }>} Result of password reset.
- */
-export async function recoverPassword(email, code, newPassword) {
-  const users = getStoredUsers();
-  const cleanEmail = email.trim().toLowerCase();
-
-  const userIndex = users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
-  if (userIndex === -1) {
-    return { success: false, errorKey: "userNotFound" };
-  }
-
-  // Update password in local records
-  users[userIndex].password = newPassword;
-  saveStoredUsers(users);
-
-  return { success: true };
 }

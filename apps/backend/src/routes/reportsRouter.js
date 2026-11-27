@@ -15,12 +15,13 @@ const VALID_REVIEW_STATUSES = ["IN_REVIEW", "ATTENDED", "CLOSED"];
  *   updateReportStatus: Function,
  *   removeReportedContentAndAttend: Function
  * }} reportRepository - Report repository instance.
+ * @param {import("express").RequestHandler} requireModerator - Middleware that only lets moderators through.
  * @returns {import("express").Router} Configured Express router.
  */
-function createReportsRouter(reportRepository) {
+function createReportsRouter(reportRepository, requireModerator) {
     const router = express.Router();
 
-    router.get("/", async (req, res) => {
+    router.get("/", requireModerator, async (req, res) => {
         const { status } = req.query;
         let resolvedStatus;
 
@@ -86,7 +87,7 @@ function createReportsRouter(reportRepository) {
         res.status(201).json({ report });
     });
 
-    router.patch("/:id", async (req, res) => {
+    router.patch("/:id", requireModerator, async (req, res) => {
         const { id } = req.params;
         if (typeof id !== "string" || !UUID_REGEX.test(id)) {
             res.status(400).json({ error: "Invalid report id" });
@@ -125,7 +126,7 @@ function createReportsRouter(reportRepository) {
         res.status(200).json({ report });
     });
 
-    router.post("/:id/remove-content", async (req, res) => {
+    router.post("/:id/remove-content", requireModerator, async (req, res) => {
         const { id } = req.params;
         if (typeof id !== "string" || !UUID_REGEX.test(id)) {
             res.status(400).json({ error: "Invalid report id" });

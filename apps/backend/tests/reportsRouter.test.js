@@ -51,10 +51,14 @@ function createMockReportRepository(overrides = {}) {
     };
 }
 
-async function withServer(reportRepository, callback) {
+const allowModeration = (req, res, next) => next();
+
+async function withServer(reportRepository, callback, options = {}) {
     const app = createApp({
         videogameRepository: createMockVideogameRepository(),
-        reportRepository
+        reportRepository,
+        authRepository: options.authRepository,
+        requireModerator: options.enforceModeration ? undefined : allowModeration
     });
     const server = await new Promise((resolve) => {
         const instance = app.listen(0, "127.0.0.1", () => resolve(instance));
@@ -452,6 +456,33 @@ describe("reportsRouter", () => {
                 reviewerId: SAMPLE_REVIEWER_ID
             });
         });
+    });
+});
+
+describe("reportsRouter moderation access", () => {
+    it("should return 401 for GET /api/reports when the request has no session cookie", async () => {
+        await withServer(createMockReportRepository(), async (baseUrl) => {
+            const response = await fetch(`${baseUrl}/api/reports`);
+            assert.equal(response.status, 401);
+        }, { enforceModeration: true });
+    });
+
+    it("should return 403 for PATCH /api/reports/:id when the session account cannot moderate", async () => {
+        const authRepository = {
+            async findActiveSessionUser() {
+                return { id_user: SAMPLE_REPORTER_ID, username: "player_one" };
+            }
+        };
+        await withServer(createMockReportRepository(), async (baseUrl) => {
+            const response = await fetch(`${baseUrl}/api/reports/${SAMPLE_CONTENT_ID}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", Cookie: "letsplay_session=session-token" },
+                body: JSON.stringify({ status: "CLOSED" })
+            });
+            const body = await response.json();
+            assert.equal(response.status, 403);
+            assert.equal(body.error, "Moderation permission required");
+        }, { enforceModeration: true, authRepository });
     });
 });
 

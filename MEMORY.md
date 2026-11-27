@@ -27,6 +27,7 @@ Memoria transversal entre sesiones. Máximo ~50 líneas. Memorias por carpeta: `
 - No fusiones `feat/gaming-survey` ni toques código, localStorage o `node_modules` sin aprobación.
 
 ## Próximos pasos
-- Documentar la encuesta en RF/formularios (RF-127) y definir su integración con `ProfileForm`.
+- Fase 2 (2026-11-28, sin commit): autenticación con sesiones en `ActiveSessions`, preferencias por cuenta y edición desde perfil. Pendiente: `.env` local debe usar `PGUSER=letsplay_admin`; decidir el contraste de `#bb8484` (no cumple AA); alinear etiquetas de horario con LFG; `POST /api/reports` debe usar la sesión.
+- Recuperación de contraseña retirada hasta definir el flujo por correo. Moderación bloqueada hasta definir permisos.
 - Cerrar la pregunta `src-client`/`src-server` y registrar la decisión.
 - Completar `1.5.1`, crear `1.5.2` y ampliar `1.5.3`.

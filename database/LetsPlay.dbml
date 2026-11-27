@@ -40,6 +40,10 @@ enum community_status {
 
 enum gender {
   UNDEFINED
+  MALE
+  FEMALE
+  NON_BINARY
+  OTHER
 }
 
 enum report_content_type {
@@ -98,7 +102,7 @@ Table User {
   account_status account_status [not null]
 
   checks {
-    `username ~ '^[A-Za-z0-9]+$'` [name: 'chk_user_username_format']
+    `username ~ '^[A-Za-z0-9_]+$'` [name: 'chk_user_username_format']
   }
 }
 
@@ -106,6 +110,17 @@ Table UserVideogames {
   id_user uuid [pk]
   id_videogame uuid [pk]
   added_at timestamptz [not null, default: `now()`]
+}
+
+Table ActiveSessions {
+  token_hash varchar(64) [pk]
+  id_user uuid [not null]
+  created_at timestamptz [not null, default: `now()`]
+  expires_at timestamptz [not null]
+
+  checks {
+    `expires_at > created_at` [name: 'chk_session_expiry_after_creation']
+  }
 }
 
 Table GamerPreference {
@@ -413,6 +428,7 @@ Ref: Message.id_conversation > Conversation.id_conversation
 Ref: Message.id_sender > User.id_user
 Ref: Message.id_recipient > User.id_user
 Ref: GamerPreference.id_user > User.id_user
+Ref: ActiveSessions.id_user > User.id_user
 Ref: Poll.id_post > Post.id_post
 Ref: PollOption.id_poll > Poll.id_poll
 Ref: PollVote.id_poll > Poll.id_poll

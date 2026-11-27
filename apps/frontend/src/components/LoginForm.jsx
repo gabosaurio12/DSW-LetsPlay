@@ -100,16 +100,6 @@ function LoginForm({ translate, onNavigate, onLoginSuccess }) {
             {isSubmitting ? translate("auth.login.submitting") : translate("auth.login.submit")}
           </button>
 
-          <div className="auth-link-container">
-            <button
-              type="button"
-              className="auth-link-button"
-              onClick={() => onNavigate("recovery")}
-            >
-              {translate("auth.login.forgotPassword")}
-            </button>
-          </div>
-
           <div className="auth-divider" />
 
           <button

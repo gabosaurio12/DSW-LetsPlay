@@ -1,64 +1,49 @@
-import { WELCOME_SURVEY_STEPS } from "../data/welcomeSurveyData.js";
-
-const STORAGE_KEY = "letsPlay.welcomeSurvey";
+const GAMER_PREFERENCES_PATH = "/api/me/gamer-preferences";
 
 /**
- * Validates that a parsed response has the expected shape: one array of
- * selected option ids per survey step.
+ * Creates an error that carries the HTTP status, so callers can tell an expired
+ * session (401) from a failed request.
  *
- * @param {unknown} response - The parsed response to validate.
- * @returns {boolean} True when the response can be used to seed the survey.
+ * @param {string} message - Description of the failure.
+ * @param {number} status - HTTP status returned by the server.
+ * @returns {Error} The error with a numeric status property.
  */
-function isValidResponse(response) {
-  if (response === null || typeof response !== "object") {
-    return false;
-  }
-  return WELCOME_SURVEY_STEPS.every((step) => {
-    const selection = response[step.id];
-    if (!Array.isArray(selection)) {
-      return false;
-    }
-    const validOptionIds = step.options.map((option) => option.id);
-    return selection.every((optionId) => validOptionIds.includes(optionId));
-  });
+function createRequestError(message, status) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
 }
 
 /**
- * Loads the welcome survey answers saved in local storage.
+ * Loads the gamer preferences saved for the signed-in account.
  *
- * @returns {Promise<Object|null>} The stored selection, or null when there is
- * nothing saved or the stored data is corrupted.
+ * @returns {Promise<{ genres: string[], platforms: string[], availability: string[] } | null>}
+ * The saved selection, or null when the account has not answered the survey yet.
+ * @throws {Error} When the request fails. Its status property is 401 when the session has expired.
  */
 export async function loadWelcomeSurvey() {
-  try {
-    const storedValue = window.localStorage.getItem(STORAGE_KEY);
-    if (storedValue === null) {
-      return null;
-    }
-    // Old or corrupted data must not block the survey, so it is treated as absent.
-    const parsedValue = JSON.parse(storedValue);
-    if (!isValidResponse(parsedValue)) {
-      return null;
-    }
-    return parsedValue;
-  } catch {
-    // localStorage and JSON.parse failures degrade to "no saved answers".
-    return null;
+  const response = await fetch(GAMER_PREFERENCES_PATH);
+  if (!response.ok) {
+    throw createRequestError(`Failed to load gamer preferences (${response.status})`, response.status);
   }
+  const body = await response.json();
+  return body.preferences;
 }
 
 /**
- * Saves the welcome survey answers in local storage.
+ * Saves the gamer preferences of the signed-in account, replacing the previous ones.
  *
- * @param {Object} selection - An object mapping each step id to its selected option ids.
- * @returns {Promise<boolean>} True when the answers were saved successfully.
+ * @param {{ genres: string[], platforms: string[], availability: string[] }} selection - Selected option ids per question.
+ * @returns {Promise<void>} Resolves when the server has stored the selection.
+ * @throws {Error} When the request fails. Its status property is 401 when the session has expired.
  */
 export async function saveWelcomeSurvey(selection) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(selection));
-    return true;
-  } catch {
-    // Storage can be full or blocked (private mode); the caller must show an error.
-    return false;
+  const response = await fetch(GAMER_PREFERENCES_PATH, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(selection),
+  });
+  if (!response.ok) {
+    throw createRequestError(`Failed to save gamer preferences (${response.status})`, response.status);
   }
 }

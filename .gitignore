@@ -1,5 +1,4 @@
 .DS_Store
-.env
 dist/
 .obsidian
 .opencode
@@ -11,3 +10,4 @@ apps/backend/uploads/
 .agents/skills/*
 !.agents/skills/figma-parity/
 .MEMORY.md
+.env
