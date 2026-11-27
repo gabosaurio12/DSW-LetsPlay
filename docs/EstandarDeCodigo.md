@@ -126,12 +126,12 @@ Los campos de clases y las propiedades de objetos deben escribirse en **camelCas
 
 ```javascript
 class GameSession {
-  #currentWeapon;
-  activePlayers = [];
+    #currentWeapon;
+    activePlayers = [];
 
-  constructor() {
-    this.#currentWeapon = null;
-  }
+    constructor() {
+        this.#currentWeapon = null;
+    }
 }
 ```
 
@@ -139,8 +139,8 @@ class GameSession {
 
 ```javascript
 class GameSession {
-  CurrentWeapon;
-  Active_Players = [];
+    CurrentWeapon;
+    Active_Players = [];
 }
 ```
 
@@ -241,7 +241,7 @@ Los componentes de React deben nombrarse con **PascalCase**, sean funciones o cl
 
 ```jsx
 function UserProfileCard({ user }) {
-  return <div className="profile-card">{user.name}</div>;
+    return <div className="profile-card">{user.name}</div>;
 }
 
 export default UserProfileCard;
@@ -251,7 +251,7 @@ export default UserProfileCard;
 
 ```jsx
 function userProfileCard({ user }) {
-  return <div className="profile-card">{user.name}</div>;
+    return <div className="profile-card">{user.name}</div>;
 }
 ```
 
@@ -267,7 +267,7 @@ Los hooks personalizados de React deben iniciar obligatoriamente con el prefijo 
 
 ```javascript
 function useFriendsList(userId) {
-  // ...
+    // ...
 }
 ```
 
@@ -275,11 +275,11 @@ function useFriendsList(userId) {
 
 ```javascript
 function friendsList(userId) {
-  // ...
+    // ...
 }
 
 function GetFriendsList(userId) {
-  // ...
+    // ...
 }
 ```
 
@@ -291,13 +291,13 @@ En TypeScript **no se usa prefijo** para interfaces ni tipos; se nombran con **P
 
 ```typescript
 interface UserProfile {
-  id: string;
-  displayName: string;
+    id: string;
+    displayName: string;
 }
 
 type GameInvite = {
-  fromUserId: string;
-  toUserId: string;
+    fromUserId: string;
+    toUserId: string;
 };
 ```
 
@@ -305,8 +305,8 @@ type GameInvite = {
 
 ```typescript
 interface IUserProfile {
-  id: string;
-  displayName: string;
+    id: string;
+    displayName: string;
 }
 ```
 
@@ -362,21 +362,9 @@ Las abreviaturas serán válidas solo en dos casos: que sean referentes a reglas
 
 ## 3.1. Indentación
 
-Para los espacios de indentación deberán usarse espacios en blanco, cada nivel equivale a **2 espacios** (convención estándar en JavaScript/React). Un "tab" equivaldrá a 2 espacios en blanco.
+Para los espacios de indentación deberán usarse espacios en blanco, cada nivel equivale a **4 espacios** (convención acordada para el proyecto). Un "tab" equivaldrá a 4 espacios en blanco.
 
 **Correcto**
-
-```javascript
-class Person {
-  printName(repetitions) {
-    for (let i = 0; i < repetitions; i++) {
-      console.log(this.name);
-    }
-  }
-}
-```
-
-**Incorrecto**
 
 ```javascript
 class Person {
@@ -385,6 +373,18 @@ class Person {
             console.log(this.name);
         }
     }
+}
+```
+
+**Incorrecto**
+
+```javascript
+class Person {
+        printName(repetitions) {
+                for (let i = 0; i < repetitions; i++) {
+                        console.log(this.name);
+                }
+        }
 }
 ```
 
@@ -401,8 +401,8 @@ Cada línea debe tener por mucho **100 caracteres**. En caso de que se exceda es
 
 ```javascript
 const activePlayers = players
-  .filter((player) => player.isOnline)
-  .map((player) => player.name);
+    .filter((player) => player.isOnline)
+    .map((player) => player.name);
 ```
 
 **Incorrecto**
@@ -422,7 +422,7 @@ const total = firstNumber + secondNumber;
 console.log("Calculation result:", total);
 
 for (let i = 0; i < 10; i++) {
-  console.log("Iteration:", i);
+    console.log("Iteration:", i);
 }
 ```
 
@@ -432,7 +432,7 @@ for (let i = 0; i < 10; i++) {
 const total=firstNumber+secondNumber;
 console.log("Result:"+total);
 for(let i=0;i<10;i++){
-  console.log(i);
+    console.log(i);
 }
 ```
 
@@ -444,9 +444,9 @@ Las llaves de apertura de clases, funciones, componentes y estructuras de contro
 
 ```javascript
 class Client {
-  greet() {
-    console.log("Hello!");
-  }
+    greet() {
+        console.log("Hello!");
+    }
 }
 ```
 
@@ -455,10 +455,10 @@ class Client {
 ```javascript
 class Client
 {
-  greet()
-  {
-    console.log("Hello!");
-  }
+    greet()
+    {
+        console.log("Hello!");
+    }
 }
 ```
 
@@ -474,9 +474,9 @@ Cuando el contenido dentro de los paréntesis de una llamada a función sea muy 
 
 ```javascript
 character.equip(
-  fightingEquipment,
-  potions,
-  fastAbilities
+    fightingEquipment,
+    potions,
+    fastAbilities
 );
 ```
 
@@ -570,9 +570,9 @@ Con cuerpo de bloque (varias líneas):
 
 ```javascript
 const classifyNumber = (n) => {
-  if (n < 0) return "Negative";
-  if (n === 0) return "Zero";
-  return "Positive";
+    if (n < 0) return "Negative";
+    if (n === 0) return "Zero";
+    return "Positive";
 };
 ```
 
@@ -606,10 +606,10 @@ const onlinePlayers = players.filter((p) => p.isOnline);
 const eligiblePlayers = players.filter(isEligiblePlayer);
 
 function isEligiblePlayer(player) {
-  const score = player.wins * 3 + player.draws;
-  const bonus = player.isCaptain ? 10 : 0;
-  const adjusted = score + bonus - player.penalties;
-  return adjusted > 50 && player.yearsActive > 2 && !player.isSuspended;
+    const score = player.wins * 3 + player.draws;
+    const bonus = player.isCaptain ? 10 : 0;
+    const adjusted = score + bonus - player.penalties;
+    return adjusted > 50 && player.yearsActive > 2 && !player.isSuspended;
 }
 ```
 
@@ -617,10 +617,10 @@ function isEligiblePlayer(player) {
 
 ```javascript
 const eligiblePlayers = players.filter((player) => {
-  const score = player.wins * 3 + player.draws;
-  const bonus = player.isCaptain ? 10 : 0;
-  const adjusted = score + bonus - player.penalties;
-  return adjusted > 50 && player.yearsActive > 2 && !player.isSuspended;
+    const score = player.wins * 3 + player.draws;
+    const bonus = player.isCaptain ? 10 : 0;
+    const adjusted = score + bonus - player.penalties;
+    return adjusted > 50 && player.yearsActive > 2 && !player.isSuspended;
 });
 ```
 
@@ -652,8 +652,8 @@ Toda operación asíncrona (peticiones HTTP, consultas a PostgreSQL/MongoDB, lec
 
 ```javascript
 async function getUserProfile(userId) {
-  const user = await userRepository.findById(userId);
-  return user;
+    const user = await userRepository.findById(userId);
+    return user;
 }
 ```
 
@@ -661,9 +661,9 @@ async function getUserProfile(userId) {
 
 ```javascript
 function getUserProfile(userId) {
-  return userRepository.findById(userId).then((user) => {
-    return user;
-  });
+    return userRepository.findById(userId).then((user) => {
+        return user;
+    });
 }
 ```
 
@@ -695,9 +695,9 @@ Permiten filtrar, transformar y agregar colecciones de forma declarativa. Deben 
 
 ```javascript
 const topScores = players
-  .filter((p) => p.score > 100)
-  .sort((a, b) => b.score - a.score)
-  .map((p) => p.name);
+    .filter((p) => p.score > 100)
+    .sort((a, b) => b.score - a.score)
+    .map((p) => p.name);
 ```
 
 **Incorrecto (bucle manual innecesario)**
@@ -705,9 +705,9 @@ const topScores = players
 ```javascript
 const topScores = [];
 for (let i = 0; i < players.length; i++) {
-  if (players[i].score > 100) {
-    topScores.push(players[i]);
-  }
+    if (players[i].score > 100) {
+        topScores.push(players[i]);
+    }
 }
 topScores.sort((a, b) => b.score - a.score);
 ```
@@ -728,12 +728,12 @@ Debe haber un espacio entre `if` y la condición. Se deben utilizar llaves siemp
 
 ```javascript
 function checkAge(studentAge) {
-  const adultAge = 18;
-  if (studentAge >= adultAge) {
-    console.log("The student is an adult.");
-  } else {
-    console.log("The student is underage.");
-  }
+    const adultAge = 18;
+    if (studentAge >= adultAge) {
+        console.log("The student is an adult.");
+    } else {
+        console.log("The student is underage.");
+    }
 }
 ```
 
@@ -741,11 +741,11 @@ function checkAge(studentAge) {
 
 ```javascript
 function checkAge(studentAge) {
-  const adultAge = 18;
-  if(studentAge >= adultAge)
-    console.log("The student is an adult.");
-  else
-    console.log("The student is underage.");
+    const adultAge = 18;
+    if(studentAge >= adultAge)
+        console.log("The student is an adult.");
+    else
+        console.log("The student is underage.");
 }
 ```
 
@@ -763,7 +763,7 @@ const classify = (n) => (n >= 0 ? "Non-negative" : "Negative");
 
 ```javascript
 function checkAge(studentAge) {
-  if (studentAge >= 18) console.log("The student is an adult.");
+    if (studentAge >= 18) console.log("The student is an adult.");
 }
 ```
 
@@ -775,13 +775,13 @@ La estructura `else if` debe ir en la misma línea que la llave de cierre del bl
 
 ```javascript
 function checkGrade(grade) {
-  if (grade >= 8) {
-    return "Excellent!";
-  } else if (grade >= 6) {
-    return "Good!";
-  } else {
-    return "You can do it better!";
-  }
+    if (grade >= 8) {
+        return "Excellent!";
+    } else if (grade >= 6) {
+        return "Good!";
+    } else {
+        return "You can do it better!";
+    }
 }
 ```
 
@@ -789,15 +789,15 @@ function checkGrade(grade) {
 
 ```javascript
 function checkGrade(grade) {
-  if (grade >= 8) {
-    return "Excellent!";
-  }
-  else if (grade >= 6) {
-    return "Good!";
-  }
-  else {
-    return "You can do it better!";
-  }
+    if (grade >= 8) {
+        return "Excellent!";
+    }
+    else if (grade >= 6) {
+        return "Good!";
+    }
+    else {
+        return "You can do it better!";
+    }
 }
 ```
 
@@ -809,14 +809,14 @@ Debe declararse en una nueva línea, con un espacio antes de la condición. Cada
 
 ```javascript
 function menu(option) {
-  switch (option) {
-    case 1:
-      console.log("You selected option 1");
-      break;
-    default:
-      console.log("Select a valid option");
-      break;
-  }
+    switch (option) {
+        case 1:
+            console.log("You selected option 1");
+            break;
+        default:
+            console.log("Select a valid option");
+            break;
+    }
 }
 ```
 
@@ -824,14 +824,14 @@ function menu(option) {
 
 ```javascript
 function menu(option) {
-  switch(option) {
-  case 1:
-  console.log("You selected option 1");
-  break;
-  default:
-  console.log("Select a valid option");
-  break;
-  }
+    switch(option) {
+    case 1:
+    console.log("You selected option 1");
+    break;
+    default:
+    console.log("Select a valid option");
+    break;
+    }
 }
 ```
 
@@ -854,11 +854,11 @@ const accessFee = isAdult ? 0 : 10;
 
 ```javascript
 const triangleType =
-  sideA === sideB && sideB === sideC
-    ? "Equilateral"
-    : sideA === sideC || sideB === sideC
-    ? "Isosceles"
-    : "Scalene";
+    sideA === sideB && sideB === sideC
+        ? "Equilateral"
+        : sideA === sideC || sideB === sideC
+        ? "Isosceles"
+        : "Scalene";
 ```
 
 ## 5.6. While
@@ -869,8 +869,8 @@ Debe existir un espacio entre la palabra `while` y la condición. Siempre se deb
 
 ```javascript
 while (numberA >= 0) {
-  console.log(numberA);
-  numberA--;
+    console.log(numberA);
+    numberA--;
 }
 ```
 
@@ -889,8 +889,8 @@ La llave de apertura debe ir en la misma línea que `do`. La palabra `while` deb
 ```javascript
 let numberA = 0;
 do {
-  console.log(numberA);
-  numberA++;
+    console.log(numberA);
+    numberA++;
 } while (numberA <= 5);
 ```
 
@@ -900,8 +900,8 @@ do {
 let numberA = 0;
 do
 {
-  console.log(numberA);
-  numberA++;
+    console.log(numberA);
+    numberA++;
 }
 while (numberA <= 5);
 ```
@@ -915,13 +915,13 @@ Debe haber un espacio entre `for` y la condición, y un espacio después de cada
 ```javascript
 let evenCounter = 0;
 for (let i = 1; i <= 20; i++) {
-  if (i % 2 === 0) {
-    evenCounter++;
-  }
+    if (i % 2 === 0) {
+        evenCounter++;
+    }
 }
 
 for (const player of activePlayers) {
-  console.log(player.name);
+    console.log(player.name);
 }
 ```
 
@@ -930,7 +930,7 @@ for (const player of activePlayers) {
 ```javascript
 let evenCounter = 0;
 for(let i=1;i<=20;i++){
-  if(i%2===0){evenCounter++;}
+    if(i%2===0){evenCounter++;}
 }
 ```
 
@@ -952,11 +952,11 @@ Dentro del `try` debe estar, de preferencia, solo el código que puede lanzar un
 
 ```javascript
 try {
-  const user = await userRepository.findById(userId);
-  return user;
+    const user = await userRepository.findById(userId);
+    return user;
 } catch (error) {
-  logger.error("userService.getUserProfile", error);
-  throw new NotFoundError("User not found");
+    logger.error("userService.getUserProfile", error);
+    throw new NotFoundError("User not found");
 }
 ```
 
@@ -964,11 +964,11 @@ try {
 
 ```javascript
 try {
-  const user = await userRepository.findById(userId);
-  return user;
+    const user = await userRepository.findById(userId);
+    return user;
 }
 catch (error) {
-  console.log(error.message);
+    console.log(error.message);
 }
 ```
 
@@ -980,12 +980,12 @@ Toda función `async` usada como controlador de ruta en Express debe envolver su
 
 ```javascript
 router.get("/users/:id", async (req, res, next) => {
-  try {
-    const user = await userService.getUserProfile(req.params.id);
-    res.json(user);
-  } catch (error) {
-    next(error);
-  }
+    try {
+        const user = await userService.getUserProfile(req.params.id);
+        res.json(user);
+    } catch (error) {
+        next(error);
+    }
 });
 ```
 
@@ -993,8 +993,8 @@ router.get("/users/:id", async (req, res, next) => {
 
 ```javascript
 router.get("/users/:id", async (req, res) => {
-  const user = await userService.getUserProfile(req.params.id);
-  res.json(user);
+    const user = await userService.getUserProfile(req.params.id);
+    res.json(user);
 });
 ```
 
@@ -1010,12 +1010,12 @@ El proyecto debe contar con un único middleware de manejo de errores centraliza
 
 ```javascript
 function errorHandler(err, req, res, next) {
-  logger.error(err);
+    logger.error(err);
 
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({
-    message: err.isOperational ? err.message : "Unexpected error",
-  });
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({
+        message: err.isOperational ? err.message : "Unexpected error",
+    });
 }
 
 app.use(errorHandler);
@@ -1025,7 +1025,7 @@ app.use(errorHandler);
 
 ```javascript
 app.use((err, req, res, next) => {
-  res.status(500).send(err.stack);
+    res.status(500).send(err.stack);
 });
 ```
 
@@ -1043,9 +1043,9 @@ Se debe usar una librería de logging (como **Winston** o **Pino**) en lugar de 
 logger.info("Server started on port 3000");
 
 try {
-  await db.connect();
+    await db.connect();
 } catch (error) {
-  logger.error("Database connection failed", error);
+    logger.error("Database connection failed", error);
 }
 ```
 
@@ -1055,9 +1055,9 @@ try {
 console.log("server started");
 
 try {
-  await db.connect();
+    await db.connect();
 } catch (error) {
-  console.log(error);
+    console.log(error);
 }
 ```
 
@@ -1076,7 +1076,7 @@ Se usan con `//` y deben ir en la línea anterior al código que describen, nunc
 ```javascript
 // Iterate over the list to find online players
 for (const player of players) {
-  // ...
+    // ...
 }
 ```
 
@@ -1097,11 +1097,11 @@ Se escriben con `/* */`, abriendo el comentario, escribiendo el mensaje en la(s)
 
 ```javascript
 /*
-  shuffleDeck uses Fisher-Yates instead of sort(() => Math.random() - 0.5)
-  because the sort-based shuffle produces a biased distribution.
+    shuffleDeck uses Fisher-Yates instead of sort(() => Math.random() - 0.5)
+    because the sort-based shuffle produces a biased distribution.
 */
 function shuffleDeck(cards) {
-  // ...
+    // ...
 }
 ```
 
@@ -1111,7 +1111,7 @@ function shuffleDeck(cards) {
 /* This function doesn't work well */
 
 /*
-  This function is for...
+    This function is for...
 */
 ```
 
@@ -1138,10 +1138,10 @@ Las funciones públicas de servicios, utilidades compartidas y hooks personaliza
  * const remainingHp = calculateRemainingHealth(100, 30); // 70
  */
 function calculateRemainingHealth(currentHp, dealtDamage) {
-  if (dealtDamage < 0) {
-    throw new RangeError("dealtDamage can't be negative");
-  }
-  return Math.max(currentHp - dealtDamage, 0);
+    if (dealtDamage < 0) {
+        throw new RangeError("dealtDamage can't be negative");
+    }
+    return Math.max(currentHp - dealtDamage, 0);
 }
 ```
 
@@ -1173,13 +1173,13 @@ El nombre de una prueba (dentro de un bloque `it`/`test`) debe describir, en len
 
 ```javascript
 describe("loginUser", () => {
-  it("should return a token when credentials are valid", async () => {
-    // ...
-  });
+    it("should return a token when credentials are valid", async () => {
+        // ...
+    });
 
-  it("should throw an UnauthorizedError when the password is wrong", async () => {
-    // ...
-  });
+    it("should throw an UnauthorizedError when the password is wrong", async () => {
+        // ...
+    });
 });
 ```
 
@@ -1187,13 +1187,13 @@ describe("loginUser", () => {
 
 ```javascript
 describe("loginUser", () => {
-  it("test1", async () => {
-    // ...
-  });
+    it("test1", async () => {
+        // ...
+    });
 
-  it("works", async () => {
-    // ...
-  });
+    it("works", async () => {
+        // ...
+    });
 });
 ```
 
@@ -1215,23 +1215,23 @@ Debe haber un único repositorio para el proyecto (o uno por frontend/backend si
 
 ```
 repositorio
- ├── src/
- ├── tests/
- ├── README.md
- ├── .env.example
- └── .gitignore
+  ├── src/
+  ├── tests/
+  ├── README.md
+  ├── .env.example
+  └── .gitignore
 ```
 
 **Incorrecto**
 
 ```
 repositorio
- ├── src/
- ├── node_modules/
- ├── build-final.zip
- ├── backup/
- ├── .env
- └── cosas/
+  ├── src/
+  ├── node_modules/
+  ├── build-final.zip
+  ├── backup/
+  ├── .env
+  └── cosas/
 ```
 
 ### 9.2.1. Razonamiento
@@ -1317,14 +1317,14 @@ Los cambios destinados a incorporarse a la rama principal deben hacerse mediante
 
 ```
 feature/friend-requests
-         │
-         ▼
-    Pull Request
-         │
-      Revisión
-         │
-         ▼
-       main
+                  │
+                  ▼
+        Pull Request
+                  │
+            Revisión
+                  │
+                  ▼
+              main
 ```
 
 **Incorrecto**
@@ -1375,7 +1375,7 @@ GitHub. (2026). *About pull requests*. GitHub Docs. https://docs.github.com/en/p
 # Anexo. Cadena de razonamiento auditable
 
 1. Se definió el alcance del estándar a partir del stack del proyecto (React + Express.js, con persistencia en PostgreSQL y MongoDB) y de las 10 secciones solicitadas: introducción, reglas de nombrado, estilos de código, prácticas de programación, estructuras de control, manejo de excepciones, comentarios, pruebas, control de versiones y bibliografía.
-2. Para reglas de nombrado y estilo se adoptaron las convenciones estándar del ecosistema JavaScript/React (camelCase para variables, parámetros, funciones y campos; PascalCase para clases, componentes de React e interfaces/tipos de TypeScript; llaves en la misma línea de la declaración; indentación de 2 espacios), por ser las convenciones más ampliamente adoptadas por guías de estilo como la de Airbnb y por la propia documentación de React.
+2. Para reglas de nombrado y estilo se adoptaron las convenciones estándar del ecosistema JavaScript/React (camelCase para variables, parámetros, funciones y campos; PascalCase para clases, componentes de React e interfaces/tipos de TypeScript; llaves en la misma línea de la declaración; indentación de 4 espacios), por ser las convenciones más ampliamente adoptadas por guías de estilo como la de Airbnb y por la propia documentación de React.
 3. Para prácticas de programación se incluyeron los mecanismos propios del lenguaje para expresar lógica de forma concisa y segura: funciones flecha, `const`/`let`, async/await, desestructuración/spread y métodos funcionales de arreglos (`map`, `filter`, `reduce`), junto con principios agnósticos al lenguaje (SRP, evitar números mágicos, límite de parámetros, complejidad ciclomática).
 4. Para manejo de excepciones se definió el flujo específico de una aplicación Express: captura con try/catch en funciones asíncronas, propagación con `next(error)`, un middleware centralizado de manejo de errores y registro con una librería de logging (Winston o Pino) en vez de `console.log`.
 5. Para comentarios se definieron los comentarios de línea, de bloque y la documentación de funciones públicas con JSDoc, con sus etiquetas más comunes (`@param`, `@returns`, `@throws`, `@example`).

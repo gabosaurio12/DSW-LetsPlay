@@ -6,11 +6,13 @@ El proyecto es una implementación web de una red social para Gamers con el obje
 - Express.js para el backend.
 - Base de datos principal PostgreSQL.
 - Base de datos para imágenes o assets MongoDB.
-- /agents contiene los archivos para agentes de IA como AGENTS.md, MEMORY.md y cualquier otro que se genere.
-- .opencode/ guardará los comandos de opencode.
+- AGENTS.md y MEMORY.md viven en la raíz del repo.
+- apps/frontend/ contiene el proyecto del lado del cliente (React con Vite).
+- apps/backend/ contiene el proyecto del lado del servidor (Express.js).
+- docs/ contiene la documentación canónica del proyecto.
+- database/ contiene el modelo y los scripts de PostgreSQL.
+- .opencode/ guarda comandos locales de OpenCode (no versionados).
 - .agents/ guardará skills de los agentes de IA.
-- src-client/ tendrá el proyecto del lado del cliente (react).
-- src-server/ tendrá el proyecto del lado del servidor (express.js).
 - Nota real (decision 2026-11-06): el scaffold vive en apps/frontend (Vite + React) y apps/backend (Express stub), no en src-client/src-server; falta decidir si se migra todo a src-*.
 
 ## Convenciones
@@ -35,10 +37,10 @@ function getUser() {
 - El código que se genere deberá ser en inglés.
 
 ## Documentación (docs/)
-- Repo aún sin código; la documentación vive en docs/ (vault Obsidian, en español).
+- La documentación vive en docs/ (vault Obsidian, en español).
 - Esquema numerado canónico: 1.1.* definición/plan, 1.2.* requisitos/especificación/casos de uso, 1.3.* arquitectura/modelo WAE, 1.5.* pruebas/seguridad. Añadir nuevos docs siguiendo este esquema.
 - Los archivos sueltos antiguos (Requisitos funcionales.md, Casos de uso.md, etc.) duplican contenido; los numerados son los canónicos — edita esos y no crees duplicados.
-- Mantén consistentes los IDs entre docs: RF-01…RF-97, CU-01…CU-19; actores: Visitante, Usuario, Moderador, Administrador.
+- Mantén consistentes los IDs entre docs: RF-01…RF-136, CU-01…CU-51, RN-01…RN-30; actores: Visitante, Usuario, Moderador, Administrador.
 - No uses links absolutos tipo file:///c:/Users/... (existen de otra máquina); usa links relativos al vault.
 - No commitear ni editar .obsidian/.
 

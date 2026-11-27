@@ -24,7 +24,7 @@ La primera versión no incluirá las siguientes funcionalidades:
 - Aplicaciones móviles nativas para Android o iOS.
 - administración avanzada de comunidades pero si de grupos .
 - Búsqueda avanzada de usuarios, publicaciones o videojuegos.
-- transmisiones en vivo.
+- Transmisiones en vivo.
 - Funcionalidades diferenciadas para jugadores, desarrolladores y creadores de contenido.
 - Recomendaciones de videojuegos o amistades personalizadas mediante inteligencia artificial.
 - Funciones avanzadas de moderación y administración de contenido.
@@ -41,7 +41,6 @@ Debido al tiempo disponible, las funcionalidades se implementarán de acuerdo co
 | 4 | Feed principal | Los usuarios pueden visualizar las publicaciones disponibles |
 | 5 | Interacciones sociales | Los usuarios pueden dar me gusta y comentar publicaciones |
 | 6 | Gestión de perfil | Los usuarios pueden editar su información y fotografía |
-
 
 
 ## 3. Entregables del proyecto
