@@ -163,98 +163,123 @@ describe("calculateCompatibilityScore (RN-28 50/30/20)", () => {
     });
 });
 
+function createFakeLfgPrisma(overrides = {}) {
+    const prisma = {
+        gamerPreference: {
+            async findUnique() {
+                return null;
+            }
+        },
+        userVideogames: {
+            async findMany() {
+                return [];
+            }
+        },
+        user: {
+            async findMany() {
+                return [];
+            }
+        },
+        lfgPost: {
+            async findMany() {
+                return [];
+            },
+            async create() {
+                return null;
+            }
+        },
+        videogames: {
+            async findFirst() {
+                return null;
+            }
+        }
+    };
+
+    for (const [model, methods] of Object.entries(overrides)) {
+        prisma[model] = { ...prisma[model], ...methods };
+    }
+    return prisma;
+}
+
+function candidate(userId, username, preference) {
+    return {
+        id_user: userId,
+        username,
+        display_name: username,
+        profile_photo_url: null,
+        description: null,
+        GamerPreference: preference
+    };
+}
+
+function ownedGame(userId, videogameId, name) {
+    return { id_user: userId, id_videogame: videogameId, Videogames: { name } };
+}
+
 describe("lfgRepository", () => {
     it("findCompatiblePlayers excludes blocks and inactive accounts, applies filters, and sorts by score", async () => {
-        const queries = [];
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-
-                if (sql.includes("FROM \"GamerPreference\"")) {
-                    return {
-                        rows: [{
+        const candidateQueries = [];
+        const prisma = createFakeLfgPrisma({
+            gamerPreference: {
+                async findUnique() {
+                    return { active_platforms: ["PC", "PlayStation"], availability: ["Weeknights"] };
+                }
+            },
+            userVideogames: {
+                async findMany(args) {
+                    if (typeof args.where.id_user === "string") {
+                        return [{ id_videogame: SAMPLE_GAME_ID_1, Videogames: { name: "Halo Infinite" } }];
+                    }
+                    return [
+                        ownedGame(SAMPLE_USER_ID_1, SAMPLE_GAME_ID_1, "Halo Infinite"),
+                        ownedGame(SAMPLE_USER_ID_2, SAMPLE_GAME_ID_2, "Elden Ring"),
+                        ownedGame(SAMPLE_USER_ID_3, SAMPLE_GAME_ID_1, "Halo Infinite")
+                    ];
+                }
+            },
+            user: {
+                async findMany(args) {
+                    candidateQueries.push(args);
+                    return [
+                        candidate(SAMPLE_USER_ID_1, "zara", {
+                            favorite_genres: ["FPS"],
                             active_platforms: ["PC", "PlayStation"],
                             availability: ["Weeknights"],
                             preferred_style: "COOPERATIVE",
                             looking_to_play: true
-                        }]
-                    };
+                        }),
+                        candidate(SAMPLE_USER_ID_2, "alex", {
+                            favorite_genres: ["RPG"],
+                            active_platforms: ["PC"],
+                            availability: ["Mornings"],
+                            preferred_style: "COOPERATIVE",
+                            looking_to_play: true
+                        }),
+                        candidate(SAMPLE_USER_ID_3, "bruno", {
+                            favorite_genres: ["FPS"],
+                            active_platforms: ["PC"],
+                            availability: ["Mornings"],
+                            preferred_style: "COOPERATIVE",
+                            looking_to_play: true
+                        })
+                    ];
                 }
-
-                if (sql.includes("WHERE uv.\"id_user\" = $1")) {
-                    return {
-                        rows: [{ id_videogame: SAMPLE_GAME_ID_1, name: "Halo Infinite" }]
-                    };
-                }
-
-                if (sql.includes("FROM \"User\" u")) {
-                    return {
-                        rows: [
-                            {
-                                id_user: SAMPLE_USER_ID_1,
-                                username: "zara",
-                                display_name: "Zara",
-                                profile_photo_url: null,
-                                favorite_genres: ["FPS"],
-                                active_platforms: ["PC", "PlayStation"],
-                                availability: ["Weeknights"],
-                                preferred_style: "COOPERATIVE",
-                                looking_to_play: true
-                            },
-                            {
-                                id_user: SAMPLE_USER_ID_2,
-                                username: "alex",
-                                display_name: "Alex",
-                                profile_photo_url: null,
-                                favorite_genres: ["RPG"],
-                                active_platforms: ["PC"],
-                                availability: ["Mornings"],
-                                preferred_style: "COOPERATIVE",
-                                looking_to_play: true
-                            },
-                            {
-                                id_user: SAMPLE_USER_ID_3,
-                                username: "bruno",
-                                display_name: "Bruno",
-                                profile_photo_url: null,
-                                favorite_genres: ["FPS"],
-                                active_platforms: ["PC"],
-                                availability: ["Mornings"],
-                                preferred_style: "COOPERATIVE",
-                                looking_to_play: true
-                            }
-                        ]
-                    };
-                }
-
-                if (sql.includes("ANY($1::uuid[])")) {
-                    return {
-                        rows: [
-                            { id_user: SAMPLE_USER_ID_1, id_videogame: SAMPLE_GAME_ID_1, name: "Halo Infinite" },
-                            { id_user: SAMPLE_USER_ID_2, id_videogame: SAMPLE_GAME_ID_2, name: "Elden Ring" },
-                            { id_user: SAMPLE_USER_ID_3, id_videogame: SAMPLE_GAME_ID_1, name: "Halo Infinite" }
-                        ]
-                    };
-                }
-
-                return { rows: [] };
             }
-        };
+        });
 
-        const repo = createLfgRepository(pool);
+        const repo = createLfgRepository(prisma);
         const result = await repo.findCompatiblePlayers({
             onlyAvailable: true,
             style: "COOPERATIVE",
             platform: "PC"
         });
 
-        const candidateQuery = queries.find((q) => q.sql.includes("FROM \"User\" u"));
-        assert.ok(candidateQuery.sql.includes("u.\"account_status\" = 'ACTIVE'"));
-        assert.ok(candidateQuery.sql.includes("u.\"id_user\" <> $1"));
-        assert.ok(candidateQuery.sql.includes("FROM \"Blocks\" b"));
-        assert.ok(candidateQuery.sql.includes("gp.\"looking_to_play\" = true"));
-        assert.ok(candidateQuery.sql.includes("gp.\"preferred_style\" = $2"));
-        assert.deepEqual(candidateQuery.params, [DEMO_USER_ID, "COOPERATIVE"]);
+        const where = candidateQueries[0].where;
+        assert.equal(where.account_status, "ACTIVE");
+        assert.deepEqual(where.id_user, { not: DEMO_USER_ID });
+        assert.deepEqual(where.GamerPreference, { looking_to_play: true, preferred_style: "COOPERATIVE" });
+        assert.ok(where.Blocks_Blocks_id_blockerToUser);
+        assert.ok(where.Blocks_Blocks_id_blockedToUser);
 
         assert.equal(result.players.length, 2);
         assert.equal(result.players[0].id_user, SAMPLE_USER_ID_1);
@@ -271,107 +296,67 @@ describe("lfgRepository", () => {
     });
 
     it("should exclude candidates without shared games when the viewer has a library", async () => {
-        const pool = {
-            async query(sql) {
-                if (sql.includes("FROM \"GamerPreference\"")) {
-                    return {
-                        rows: [{
-                            active_platforms: ["PC"],
-                            availability: ["Weeknights"],
-                            preferred_style: "CASUAL",
-                            looking_to_play: true
-                        }]
-                    };
+        const prisma = createFakeLfgPrisma({
+            gamerPreference: {
+                async findUnique() {
+                    return { active_platforms: ["PC"], availability: ["Weeknights"] };
                 }
-
-                if (sql.includes("WHERE uv.\"id_user\" = $1")) {
-                    return {
-                        rows: [{ id_videogame: SAMPLE_GAME_ID_1, name: "Halo Infinite" }]
-                    };
+            },
+            userVideogames: {
+                async findMany(args) {
+                    if (typeof args.where.id_user === "string") {
+                        return [{ id_videogame: SAMPLE_GAME_ID_1, Videogames: { name: "Halo Infinite" } }];
+                    }
+                    return [ownedGame(SAMPLE_USER_ID_2, SAMPLE_GAME_ID_2, "Elden Ring")];
                 }
-
-                if (sql.includes("FROM \"User\" u")) {
-                    return {
-                        rows: [
-                            {
-                                id_user: SAMPLE_USER_ID_2,
-                                username: "alex",
-                                display_name: "Alex",
-                                profile_photo_url: null,
-                                favorite_genres: ["RPG"],
-                                active_platforms: ["PC"],
-                                availability: ["Weeknights"],
-                                preferred_style: "CASUAL",
-                                looking_to_play: true
-                            }
-                        ]
-                    };
+            },
+            user: {
+                async findMany() {
+                    return [candidate(SAMPLE_USER_ID_2, "alex", {
+                        favorite_genres: ["RPG"],
+                        active_platforms: ["PC"],
+                        availability: ["Weeknights"],
+                        preferred_style: "CASUAL",
+                        looking_to_play: true
+                    })];
                 }
-
-                if (sql.includes("ANY($1::uuid[])")) {
-                    return {
-                        rows: [
-                            { id_user: SAMPLE_USER_ID_2, id_videogame: SAMPLE_GAME_ID_2, name: "Elden Ring" }
-                        ]
-                    };
-                }
-
-                return { rows: [] };
             }
-        };
+        });
 
-        const repo = createLfgRepository(pool);
-        const result = await repo.findCompatiblePlayers();
+        const result = await createLfgRepository(prisma).findCompatiblePlayers();
 
         assert.equal(result.players.length, 0);
     });
 
     it("should return platform and schedule matches when the viewer has no library yet", async () => {
-        const pool = {
-            async query(sql) {
-                if (sql.includes("FROM \"GamerPreference\"")) {
-                    return {
-                        rows: [{
-                            active_platforms: ["PC"],
-                            availability: ["Weeknights"],
-                            preferred_style: "CASUAL",
-                            looking_to_play: true
-                        }]
-                    };
+        const prisma = createFakeLfgPrisma({
+            gamerPreference: {
+                async findUnique() {
+                    return { active_platforms: ["PC"], availability: ["Weeknights"] };
                 }
-                if (sql.includes("WHERE uv.\"id_user\" = $1")) {
-                    return { rows: [] };
+            },
+            user: {
+                async findMany() {
+                    return [candidate(SAMPLE_USER_ID_2, "alex", {
+                        favorite_genres: ["RPG"],
+                        active_platforms: ["PC"],
+                        availability: ["Weeknights"],
+                        preferred_style: "CASUAL",
+                        looking_to_play: true
+                    })];
                 }
-                if (sql.includes("FROM \"User\" u")) {
-                    return {
-                        rows: [{
-                            id_user: SAMPLE_USER_ID_2,
-                            username: "alex",
-                            display_name: "Alex",
-                            profile_photo_url: null,
-                            favorite_genres: ["RPG"],
-                            active_platforms: ["PC"],
-                            availability: ["Weeknights"],
-                            preferred_style: "CASUAL",
-                            looking_to_play: true
-                        }]
-                    };
+            },
+            userVideogames: {
+                async findMany(args) {
+                    if (typeof args.where.id_user === "string") {
+                        return [];
+                    }
+                    return [ownedGame(SAMPLE_USER_ID_2, SAMPLE_GAME_ID_2, "Elden Ring")];
                 }
-                if (sql.includes("ANY($1::uuid[])")) {
-                    return {
-                        rows: [{
-                            id_user: SAMPLE_USER_ID_2,
-                            id_videogame: SAMPLE_GAME_ID_2,
-                            name: "Elden Ring"
-                        }]
-                    };
-                }
-                return { rows: [] };
             }
-        };
+        });
 
-        const repository = createLfgRepository(pool);
-        const result = await repository.findCompatiblePlayers();
+        const result = await createLfgRepository(prisma).findCompatiblePlayers();
 
         assert.equal(result.players.length, 1);
         assert.equal(result.players[0].id_user, SAMPLE_USER_ID_2);
@@ -381,34 +366,54 @@ describe("lfgRepository", () => {
         assert.deepEqual(result.players[0].shared_availability, ["Weeknights"]);
     });
 
-    it("findOpenLfgPosts queries open posts with optional gameId and platform filters", async () => {
-        const captured = [];
-        const pool = {
-            async query(sql, params) {
-                captured.push({ sql, params });
-                return { rows: [{ id_lfg: "lfg-1" }] };
+    it("findOpenLfgPosts filters by game, platform, and the viewer's visible authors", async () => {
+        const queries = [];
+        const prisma = createFakeLfgPrisma({
+            lfgPost: {
+                async findMany(args) {
+                    queries.push(args);
+                    return [];
+                }
             }
-        };
+        });
 
-        const repo = createLfgRepository(pool);
-        const posts = await repo.findOpenLfgPosts({ gameId: SAMPLE_GAME_ID_1, platform: "PC" });
+        await createLfgRepository(prisma).findOpenLfgPosts({ gameId: SAMPLE_GAME_ID_1, platform: "PC" });
 
-        assert.equal(posts.length, 1);
-        assert.ok(captured[0].sql.includes("lp.\"status\" = 'OPEN'"));
-        assert.ok(captured[0].sql.includes("lp.\"id_videogame\" = $2"));
-        assert.ok(captured[0].sql.includes("LOWER(lp.\"platform\") = LOWER($3)"));
-        assert.deepEqual(captured[0].params, [DEMO_USER_ID, SAMPLE_GAME_ID_1, "PC"]);
+        assert.equal(queries[0].where.status, "OPEN");
+        assert.equal(queries[0].where.id_videogame, SAMPLE_GAME_ID_1);
+        assert.deepEqual(queries[0].where.platform, { equals: "PC", mode: "insensitive" });
+        assert.equal(queries[0].where.User.account_status, "ACTIVE");
+        assert.deepEqual(queries[0].where.Videogames, { status: "ACTIVE" });
+        assert.deepEqual(queries[0].orderBy, { created_at: "desc" });
+    });
+
+    it("findOpenLfgPosts matches the platform literally when it contains LIKE wildcards", async () => {
+        const queries = [];
+        const prisma = createFakeLfgPrisma({
+            lfgPost: {
+                async findMany(args) {
+                    queries.push(args);
+                    return [];
+                }
+            }
+        });
+
+        await createLfgRepository(prisma).findOpenLfgPosts({ platform: "P_C" });
+
+        assert.deepEqual(queries[0].where.platform, { equals: "P\\_C", mode: "insensitive" });
+        assert.equal(queries[0].where.id_videogame, undefined);
     });
 
     it("createLfgPost returns null when active videogame is not found", async () => {
-        const pool = {
-            async query() {
-                return { rows: [] };
+        const prisma = createFakeLfgPrisma({
+            lfgPost: {
+                async create() {
+                    assert.fail("create must not run when the videogame is missing");
+                }
             }
-        };
+        });
 
-        const repo = createLfgRepository(pool);
-        const post = await repo.createLfgPost({
+        const post = await createLfgRepository(prisma).createLfgPost({
             videogameId: SAMPLE_GAME_ID_1,
             platform: "PC",
             spotsAvailable: 3,
@@ -420,31 +425,35 @@ describe("lfgRepository", () => {
     });
 
     it("createLfgPost inserts with generated UUID, demo user, and OPEN status", async () => {
-        const queries = [];
-        const pool = {
-            async query(sql, params) {
-                queries.push({ sql, params });
-                if (sql.includes("FROM \"v_public_videogame\"")) {
-                    return { rows: [{ id_videogame: SAMPLE_GAME_ID_1 }] };
+        const creates = [];
+        const prisma = createFakeLfgPrisma({
+            videogames: {
+                async findFirst() {
+                    return { id_videogame: SAMPLE_GAME_ID_1 };
                 }
-                return {
-                    rows: [{
-                        id_lfg: params[0],
-                        id_user: params[1],
-                        id_videogame: params[2],
-                        platform: params[3],
-                        spots_available: params[4],
-                        scheduled_time: params[5],
-                        description: params[6],
-                        accepts_beginners: params[7],
-                        status: "OPEN"
-                    }]
-                };
+            },
+            lfgPost: {
+                async create(args) {
+                    creates.push(args);
+                    return {
+                        id_lfg: args.data.id_lfg,
+                        id_user: args.data.id_user,
+                        id_videogame: args.data.id_videogame,
+                        platform: args.data.platform,
+                        spots_available: args.data.spots_available,
+                        scheduled_time: args.data.scheduled_time,
+                        description: args.data.description,
+                        accepts_beginners: args.data.accepts_beginners,
+                        status: args.data.status,
+                        created_at: "2026-01-01T00:00:00.000Z",
+                        User: { username: "demo", display_name: null, profile_photo_url: null },
+                        Videogames: { name: "Elden Ring", cover_url: null }
+                    };
+                }
             }
-        };
+        });
 
-        const repo = createLfgRepository(pool);
-        const post = await repo.createLfgPost({
+        const post = await createLfgRepository(prisma).createLfgPost({
             videogameId: SAMPLE_GAME_ID_1,
             platform: "PC",
             spotsAvailable: 4,
@@ -452,11 +461,13 @@ describe("lfgRepository", () => {
             description: "Co-op campaign run from the beginning."
         });
 
-        assert.equal(queries.length, 2);
+        assert.equal(creates.length, 1);
         assert.match(post.id_lfg, UUID_REGEX);
         assert.equal(post.id_user, DEMO_USER_ID);
         assert.equal(post.accepts_beginners, true);
         assert.equal(post.status, "OPEN");
+        assert.equal(post.videogame_name, "Elden Ring");
+        assert.equal(post.author_username, "demo");
     });
 });
 

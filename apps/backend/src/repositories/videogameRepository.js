@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { createCommentRepository } = require("./commentRepository");
 const {
     buildVisibleAccountFilter,
     buildNotBlockedFilter,
@@ -68,24 +69,6 @@ function mapPublicPost(post) {
 }
 
 /**
- * Converts a Prisma comment row into the public comment shape used by the API.
- *
- * @param {object} comment - Comment row with its author selected.
- * @returns {object} Public comment with flattened author fields.
- */
-function mapComment(comment) {
-    return {
-        id_comment: comment.id_comment,
-        id_post: comment.id_post,
-        content: comment.content,
-        is_spoiler: comment.is_spoiler,
-        created_at: comment.created_at,
-        author_username: comment.User.username,
-        author_display_name: comment.User.display_name
-    };
-}
-
-/**
  * Builds the Prisma filter for public videogames with optional filters.
  *
  * @param {{ genre: string|null, platform: string|null, search: string|null }} filters - Normalized filters.
@@ -140,6 +123,8 @@ function buildPublicPostWhere(videogameId, viewerId) {
  * }} Videogame repository methods.
  */
 function createVideogameRepository(prisma) {
+    const commentRepository = createCommentRepository(prisma);
+
     /**
      * Finds public videogames with optional exact genre/platform filters and text search.
      *
@@ -258,31 +243,7 @@ function createVideogameRepository(prisma) {
      * @returns {Promise<Array<object>>} Post comments ordered oldest first.
      */
     async function findCommentsByPostId(postId, viewerId) {
-        const comments = await prisma.comment.findMany({
-            where: {
-                id_post: postId,
-                User: { account_status: "ACTIVE", ...buildNotBlockedFilter(viewerId) },
-                Post: {
-                    status: "ACTIVE",
-                    User: {
-                        ...buildVisibleAccountFilter(viewerId),
-                        ...buildNotBlockedFilter(viewerId)
-                    },
-                    OR: buildPublicCommunityConditions()
-                }
-            },
-            select: {
-                id_comment: true,
-                id_post: true,
-                content: true,
-                is_spoiler: true,
-                created_at: true,
-                User: { select: { username: true, display_name: true } }
-            },
-            orderBy: { created_at: "asc" }
-        });
-
-        return comments.map(mapComment);
+        return commentRepository.findCommentsByPostId(postId, viewerId);
     }
 
     /**

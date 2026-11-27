@@ -1,96 +1,70 @@
-const crypto = require("crypto");
+const crypto = require("node:crypto");
+const {
+    buildVisibleAccountFilter,
+    buildNotBlockedFilter,
+    buildPublicCommunityConditions
+} = require("./visibilityFilters");
 
 // Temporary demo user until authentication is implemented.
 const DEMO_USER_ID = "10000000-0000-4000-8000-000000000001";
 
-const FIND_COMMENTS_BY_POST_ID_SQL = `
-SELECT cm."id_comment", cm."id_post", cm."content", cm."is_spoiler", cm."created_at",
-       u."username" AS "author_username",
-       u."display_name" AS "author_display_name"
-FROM "Comment" cm
-INNER JOIN "User" u ON u."id_user" = cm."id_user"
-INNER JOIN "Post" p ON p."id_post" = cm."id_post"
-WHERE cm."id_post" = $1
-  AND u."account_status" = 'ACTIVE'
-  AND p."status" = 'ACTIVE'
-  AND (
-      NOT EXISTS (
-          SELECT 1 FROM "User" owner
-          WHERE owner."id_user" = p."id_user" AND owner."is_private"
-      )
-      OR p."id_user" = $2
-      OR EXISTS (
-          SELECT 1 FROM "Follows" f
-          WHERE f."id_follower" = $2 AND f."id_followed" = p."id_user"
-      )
-  )
-  AND NOT EXISTS (
-      SELECT 1 FROM "Blocks" b
-      WHERE (b."id_blocker" = p."id_user" AND b."id_blocked" = $2)
-         OR (b."id_blocker" = $2 AND b."id_blocked" = p."id_user")
-  )
-  AND NOT EXISTS (
-      SELECT 1 FROM "Blocks" b
-      WHERE (b."id_blocker" = cm."id_user" AND b."id_blocked" = $2)
-         OR (b."id_blocker" = $2 AND b."id_blocked" = cm."id_user")
-  )
-  AND (
-      p."id_community" IS NULL
-      OR EXISTS (
-          SELECT 1
-          FROM "v_public_community" c
-          WHERE c."id_community" = p."id_community"
-      )
-  )
-ORDER BY cm."created_at" ASC
-`;
+const COMMENT_SELECT = {
+    id_comment: true,
+    id_post: true,
+    content: true,
+    is_spoiler: true,
+    created_at: true,
+    User: { select: { username: true, display_name: true } }
+};
 
-const FIND_ACTIVE_POST_SQL = `
-SELECT p."id_post"
-FROM "Post" p
-WHERE p."id_post" = $1
-  AND p."status" = 'ACTIVE'
-  AND (
-      NOT EXISTS (
-          SELECT 1 FROM "User" owner
-          WHERE owner."id_user" = p."id_user" AND owner."is_private"
-      )
-      OR p."id_user" = $2
-      OR EXISTS (
-          SELECT 1 FROM "Follows" f
-          WHERE f."id_follower" = $2 AND f."id_followed" = p."id_user"
-      )
-  )
-  AND NOT EXISTS (
-      SELECT 1 FROM "Blocks" b
-      WHERE (b."id_blocker" = p."id_user" AND b."id_blocked" = $2)
-         OR (b."id_blocker" = $2 AND b."id_blocked" = p."id_user")
-  )
-`;
+/**
+ * Converts a Prisma comment row into the public comment shape used by the API.
+ *
+ * @param {object} comment - Comment row selected with COMMENT_SELECT.
+ * @returns {object} Public comment with flattened author fields.
+ */
+function mapComment(comment) {
+    return {
+        id_comment: comment.id_comment,
+        id_post: comment.id_post,
+        content: comment.content,
+        is_spoiler: comment.is_spoiler,
+        created_at: comment.created_at,
+        author_username: comment.User.username,
+        author_display_name: comment.User.display_name
+    };
+}
 
-const INSERT_COMMENT_SQL = `
-WITH inserted AS (
-    INSERT INTO "Comment" ("id_comment", "id_post", "id_user", "content", "is_spoiler")
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING "id_comment", "id_post", "id_user", "content", "is_spoiler", "created_at"
-)
-SELECT ins."id_comment", ins."id_post", ins."content", ins."is_spoiler", ins."created_at",
-       u."username" AS "author_username",
-       u."display_name" AS "author_display_name"
-FROM inserted ins
-INNER JOIN "User" u ON u."id_user" = ins."id_user"
-`;
+/**
+ * Builds the filter for comments that the viewer may read: an active author and post,
+ * a visible post owner, no blocks with the viewer, and a public or no community.
+ *
+ * @param {string} postId - Post UUID.
+ * @param {string} viewerId - Current account UUID.
+ * @returns {object} Prisma where clause.
+ */
+function buildVisibleCommentWhere(postId, viewerId) {
+    return {
+        id_post: postId,
+        User: { account_status: "ACTIVE", ...buildNotBlockedFilter(viewerId) },
+        Post: {
+            status: "ACTIVE",
+            User: { ...buildVisibleAccountFilter(viewerId), ...buildNotBlockedFilter(viewerId) },
+            OR: buildPublicCommunityConditions()
+        }
+    };
+}
 
 /**
  * Creates a reusable repository for querying and creating post comments.
  *
- * @param {import("pg").Pool} pool - PostgreSQL pool instance.
+ * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance.
  * @returns {{
  *   findCommentsByPostId: Function,
  *   createComment: Function
  * }} Comment repository methods.
  */
-function createCommentRepository(pool) {
+function createCommentRepository(prisma) {
     /**
      * Finds active comments for an active post ordered chronologically.
      *
@@ -99,8 +73,12 @@ function createCommentRepository(pool) {
      * @returns {Promise<Array<object>>} Matching comments with author metadata.
      */
     async function findCommentsByPostId(postId, viewerId) {
-        const result = await pool.query(FIND_COMMENTS_BY_POST_ID_SQL, [postId, viewerId]);
-        return result.rows;
+        const comments = await prisma.comment.findMany({
+            where: buildVisibleCommentWhere(postId, viewerId),
+            select: COMMENT_SELECT,
+            orderBy: { created_at: "asc" }
+        });
+        return comments.map(mapComment);
     }
 
     /**
@@ -117,25 +95,30 @@ function createCommentRepository(pool) {
      */
     async function createComment({ postId, userId, viewerId, content, isSpoiler }) {
         const resolvedViewerId = viewerId || userId || DEMO_USER_ID;
-        const postResult = await pool.query(FIND_ACTIVE_POST_SQL, [postId, resolvedViewerId]);
-        if (postResult.rows.length === 0) {
+        const post = await prisma.post.findFirst({
+            where: {
+                id_post: postId,
+                status: "ACTIVE",
+                User: { ...buildVisibleAccountFilter(resolvedViewerId), ...buildNotBlockedFilter(resolvedViewerId) }
+            },
+            select: { id_post: true }
+        });
+        if (post === null) {
             return null;
         }
 
-        const commentId = crypto.randomUUID();
         // Replace DEMO_USER_ID with the authenticated user id once auth is implemented.
-        const resolvedUserId = viewerId || userId || DEMO_USER_ID;
-        const spoilerFlag = Boolean(isSpoiler);
-
-        const result = await pool.query(INSERT_COMMENT_SQL, [
-            commentId,
-            postId,
-            resolvedUserId,
-            content,
-            spoilerFlag
-        ]);
-
-        return result.rows[0] || null;
+        const comment = await prisma.comment.create({
+            data: {
+                id_comment: crypto.randomUUID(),
+                id_post: postId,
+                id_user: viewerId || userId || DEMO_USER_ID,
+                content,
+                is_spoiler: Boolean(isSpoiler)
+            },
+            select: COMMENT_SELECT
+        });
+        return mapComment(comment);
     }
 
     return {

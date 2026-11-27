@@ -1,106 +1,45 @@
-const crypto = require("crypto");
+const crypto = require("node:crypto");
+const { caseInsensitiveEquals } = require("../db/prisma");
+const {
+    buildVisibleAccountFilter,
+    buildNotBlockedFilter
+} = require("./visibilityFilters");
 
 // Temporary demo user until authentication is implemented.
 const DEMO_USER_ID = "10000000-0000-4000-8000-000000000001";
 const PLAY_STYLES = ["CASUAL", "COMPETITIVE", "COOPERATIVE", "INDIFFERENT"];
 
-const FIND_CURRENT_USER_PREF_SQL = `
-SELECT "active_platforms", "availability", "preferred_style", "looking_to_play"
-FROM "GamerPreference"
-WHERE "id_user" = $1
-`;
+const PREFERENCE_SELECT = {
+    favorite_genres: true,
+    active_platforms: true,
+    availability: true,
+    preferred_style: true,
+    looking_to_play: true
+};
 
-const FIND_USER_GAMES_SQL = `
-SELECT uv."id_videogame", vg."name"
-FROM "UserVideogames" uv
-INNER JOIN "v_public_videogame" vg ON vg."id_videogame" = uv."id_videogame"
-WHERE uv."id_user" = $1
-`;
+const CANDIDATE_SELECT = {
+    id_user: true,
+    username: true,
+    display_name: true,
+    profile_photo_url: true,
+    description: true,
+    GamerPreference: { select: PREFERENCE_SELECT }
+};
 
-const FIND_ACTIVE_CANDIDATES_SQL = `
-SELECT u."id_user", u."username", u."display_name", u."profile_photo_url",
-       u."description", gp."favorite_genres", gp."active_platforms", gp."availability",
-       gp."preferred_style", gp."looking_to_play"
-FROM "User" u
-LEFT JOIN "GamerPreference" gp ON gp."id_user" = u."id_user"
-WHERE u."account_status" = 'ACTIVE'
-  AND u."id_user" <> $1
-  AND NOT EXISTS (
-      SELECT 1
-      FROM "Blocks" b
-      WHERE (b."id_blocker" = $1 AND b."id_blocked" = u."id_user")
-         OR (b."id_blocker" = u."id_user" AND b."id_blocked" = $1)
-  )
-  AND (
-    NOT u."is_private"
-    OR EXISTS (
-      SELECT 1 FROM "Follows" f
-      WHERE f."id_follower" = $1 AND f."id_followed" = u."id_user"
-    )
-  )
-`;
-
-const FIND_CANDIDATES_GAMES_SQL = `
-SELECT uv."id_user", uv."id_videogame", vg."name"
-FROM "UserVideogames" uv
-INNER JOIN "v_public_videogame" vg ON vg."id_videogame" = uv."id_videogame"
-WHERE uv."id_user" = ANY($1::uuid[])
-ORDER BY vg."name" ASC
-`;
-
-const FIND_OPEN_LFG_POSTS_BASE_SQL = `
-SELECT lp."id_lfg", lp."id_user", lp."id_videogame", lp."platform",
-       lp."spots_available", lp."scheduled_time", lp."description",
-       lp."accepts_beginners", lp."status", lp."created_at",
-       u."username" AS "author_username",
-       u."display_name" AS "author_display_name",
-       u."profile_photo_url" AS "author_profile_photo_url",
-       vg."name" AS "videogame_name",
-       vg."cover_url" AS "videogame_cover_url"
-FROM "LfgPost" lp
-INNER JOIN "User" u ON u."id_user" = lp."id_user"
-INNER JOIN "v_public_videogame" vg ON vg."id_videogame" = lp."id_videogame"
-WHERE lp."status" = 'OPEN'
-  AND u."account_status" = 'ACTIVE'
-  AND (
-    NOT u."is_private"
-    OR EXISTS (
-      SELECT 1 FROM "Follows" f
-      WHERE f."id_follower" = $1 AND f."id_followed" = u."id_user"
-    )
-  )
-`;
-
-const FIND_ACTIVE_VIDEOGAME_SQL = `
-SELECT "id_videogame"
-FROM "v_public_videogame"
-WHERE "id_videogame" = $1
-`;
-
-const INSERT_LFG_POST_SQL = `
-WITH inserted AS (
-    INSERT INTO "LfgPost" (
-        "id_lfg", "id_user", "id_videogame", "platform",
-        "spots_available", "scheduled_time", "description",
-        "accepts_beginners", "status"
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN')
-    RETURNING "id_lfg", "id_user", "id_videogame", "platform",
-              "spots_available", "scheduled_time", "description",
-              "accepts_beginners", "status", "created_at"
-)
-SELECT ins."id_lfg", ins."id_user", ins."id_videogame", ins."platform",
-       ins."spots_available", ins."scheduled_time", ins."description",
-       ins."accepts_beginners", ins."status", ins."created_at",
-       u."username" AS "author_username",
-       u."display_name" AS "author_display_name",
-       u."profile_photo_url" AS "author_profile_photo_url",
-       vg."name" AS "videogame_name",
-       vg."cover_url" AS "videogame_cover_url"
-FROM inserted ins
-INNER JOIN "User" u ON u."id_user" = ins."id_user"
-INNER JOIN "v_public_videogame" vg ON vg."id_videogame" = ins."id_videogame"
-`;
+const LFG_POST_SELECT = {
+    id_lfg: true,
+    id_user: true,
+    id_videogame: true,
+    platform: true,
+    spots_available: true,
+    scheduled_time: true,
+    description: true,
+    accepts_beginners: true,
+    status: true,
+    created_at: true,
+    User: { select: { username: true, display_name: true, profile_photo_url: true } },
+    Videogames: { select: { name: true, cover_url: true } }
+};
 
 /**
  * Normalizes a list of game IDs or game objects into a Set of string IDs.
@@ -235,16 +174,126 @@ function toStringArray(value) {
 }
 
 /**
+ * Converts a Prisma LFG post row into the public shape used by the API.
+ *
+ * @param {object} post - LFG post row selected with LFG_POST_SELECT.
+ * @returns {object} LFG post with flattened author and videogame fields.
+ */
+function mapLfgPost(post) {
+    return {
+        id_lfg: post.id_lfg,
+        id_user: post.id_user,
+        id_videogame: post.id_videogame,
+        platform: post.platform,
+        spots_available: post.spots_available,
+        scheduled_time: post.scheduled_time,
+        description: post.description,
+        accepts_beginners: post.accepts_beginners,
+        status: post.status,
+        created_at: post.created_at,
+        author_username: post.User.username,
+        author_display_name: post.User.display_name,
+        author_profile_photo_url: post.User.profile_photo_url,
+        videogame_name: post.Videogames.name,
+        videogame_cover_url: post.Videogames.cover_url
+    };
+}
+
+/**
+ * Flattens a candidate row, whose preference may be missing, into one object.
+ *
+ * @param {{ GamerPreference: object|null }} candidate - Candidate row with its preference relation.
+ * @returns {object} Candidate with preference fields at the top level.
+ */
+function flattenCandidate({ GamerPreference, ...user }) {
+    return { ...user, ...(GamerPreference ?? {}) };
+}
+
+/**
+ * Builds the preference filter for candidates. Accounts without a preference row
+ * only match when no preference filter is requested.
+ *
+ * @param {{ onlyAvailable?: boolean, style?: string }} filters - Matchmaking filters.
+ * @returns {object|null} Prisma GamerPreference filter, or null when none applies.
+ */
+function buildCandidatePreferenceFilter({ onlyAvailable, style }) {
+    const conditions = {};
+    if (onlyAvailable === true) {
+        conditions.looking_to_play = true;
+    }
+    if (style) {
+        conditions.preferred_style = style.toUpperCase();
+    }
+    return Object.keys(conditions).length > 0 ? conditions : null;
+}
+
+/**
  * Creates a reusable repository for LFG matchmaking players and posts.
  *
- * @param {import("pg").Pool} pool - PostgreSQL pool instance.
+ * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance.
  * @returns {{
  *   findCompatiblePlayers: Function,
  *   findOpenLfgPosts: Function,
  *   createLfgPost: Function
  * }} LFG repository methods.
  */
-function createLfgRepository(pool) {
+function createLfgRepository(prisma) {
+    /**
+     * Lists the active games of an account that are public.
+     *
+     * @param {string} userId - Account uuid.
+     * @returns {Promise<Array<{ id_videogame: string, name: string }>>} Owned public games.
+     */
+    async function findOwnPublicGames(userId) {
+        const rows = await prisma.userVideogames.findMany({
+            where: { id_user: userId, Videogames: { status: "ACTIVE" } },
+            select: { id_videogame: true, Videogames: { select: { name: true } } }
+        });
+        return rows.map((row) => ({ id_videogame: row.id_videogame, name: row.Videogames.name }));
+    }
+
+    /**
+     * Lists the public games of several accounts, grouped by account and ordered by name.
+     *
+     * @param {Array<string>} userIds - Account uuids.
+     * @returns {Promise<Map<string, Array<{ id_videogame: string, name: string }>>>} Games by account.
+     */
+    async function findGamesByUser(userIds) {
+        const rows = await prisma.userVideogames.findMany({
+            where: { id_user: { in: userIds }, Videogames: { status: "ACTIVE" } },
+            select: { id_user: true, id_videogame: true, Videogames: { select: { name: true } } },
+            orderBy: { Videogames: { name: "asc" } }
+        });
+
+        return rows.reduce((gamesByUser, row) => {
+            const games = gamesByUser.get(row.id_user) || [];
+            games.push({ id_videogame: row.id_videogame, name: row.Videogames.name });
+            return gamesByUser.set(row.id_user, games);
+        }, new Map());
+    }
+
+    /**
+     * Finds active, visible, non-blocked accounts that are candidates for matchmaking.
+     *
+     * @param {string} viewerId - Account that searches for players.
+     * @param {{ onlyAvailable?: boolean, style?: string }} filters - Preference filters.
+     * @returns {Promise<Array<object>>} Candidate profiles with preference fields.
+     */
+    async function findActiveCandidates(viewerId, filters) {
+        const preferenceFilter = buildCandidatePreferenceFilter(filters);
+        const candidates = await prisma.user.findMany({
+            where: {
+                account_status: "ACTIVE",
+                id_user: { not: viewerId },
+                ...buildVisibleAccountFilter(viewerId),
+                ...buildNotBlockedFilter(viewerId),
+                ...(preferenceFilter ? { GamerPreference: preferenceFilter } : {})
+            },
+            select: CANDIDATE_SELECT
+        });
+        return candidates.map(flattenCandidate);
+    }
+
     /**
      * Finds compatible active, non-blocked players sorted by compatibility score.
      *
@@ -264,37 +313,21 @@ function createLfgRepository(pool) {
     async function findCompatiblePlayers(filters = {}) {
         const resolvedUserId = filters.userId || DEMO_USER_ID;
 
-        const [currentPrefResult, currentGamesResult] = await Promise.all([
-            pool.query(FIND_CURRENT_USER_PREF_SQL, [resolvedUserId]),
-            pool.query(FIND_USER_GAMES_SQL, [resolvedUserId])
+        const [currentPref, currentGames] = await Promise.all([
+            prisma.gamerPreference.findUnique({
+                where: { id_user: resolvedUserId },
+                select: { active_platforms: true, availability: true }
+            }),
+            findOwnPublicGames(resolvedUserId)
         ]);
 
-        const currentPref = currentPrefResult.rows[0] || {};
-        const currentPlatforms = toStringArray(currentPref.active_platforms);
-        const currentAvailability = toStringArray(currentPref.availability);
-        const currentGames = currentGamesResult.rows || [];
+        const currentPlatforms = toStringArray(currentPref?.active_platforms);
+        const currentAvailability = toStringArray(currentPref?.availability);
         const currentGameIds = toGameIdSet(currentGames);
         const currentPlatformSet = toNormalizedSet(currentPlatforms);
         const currentAvailabilitySet = toNormalizedSet(currentAvailability);
 
-        const candidateConditions = [];
-        const candidateParams = [resolvedUserId];
-
-        if (filters.onlyAvailable === true) {
-            candidateConditions.push(`gp."looking_to_play" = true`);
-        }
-
-        if (filters.style) {
-            candidateParams.push(filters.style.toUpperCase());
-            candidateConditions.push(`gp."preferred_style" = $${candidateParams.length}`);
-        }
-
-        const candidateSql = candidateConditions.length > 0
-            ? `${FIND_ACTIVE_CANDIDATES_SQL}  AND ${candidateConditions.join("\n  AND ")}\n`
-            : FIND_ACTIVE_CANDIDATES_SQL;
-
-        const candidatesResult = await pool.query(candidateSql, candidateParams);
-        const candidates = candidatesResult.rows || [];
+        const candidates = await findActiveCandidates(resolvedUserId, filters);
 
         const platformOptions = new Set();
         const availabilityOptions = new Set();
@@ -308,21 +341,9 @@ function createLfgRepository(pool) {
             }
         }
 
-        let gamesByUser = new Map();
-        if (candidates.length > 0) {
-            const candidateIds = candidates.map((c) => c.id_user);
-            const candidateGamesResult = await pool.query(FIND_CANDIDATES_GAMES_SQL, [candidateIds]);
-            gamesByUser = new Map();
-            for (const row of candidateGamesResult.rows || []) {
-                if (!gamesByUser.has(row.id_user)) {
-                    gamesByUser.set(row.id_user, []);
-                }
-                gamesByUser.get(row.id_user).push({
-                    id_videogame: row.id_videogame,
-                    name: row.name
-                });
-            }
-        }
+        const gamesByUser = candidates.length > 0
+            ? await findGamesByUser(candidates.map((c) => c.id_user))
+            : new Map();
 
         const normalizedPlatformFilter = filters.platform ? filters.platform.trim().toLowerCase() : null;
         const normalizedAvailabilityFilter = filters.availability ? filters.availability.trim().toLowerCase() : null;
@@ -410,24 +431,19 @@ function createLfgRepository(pool) {
      * @returns {Promise<Array<object>>} Open LFG posts ordered by newest first.
      */
     async function findOpenLfgPosts(filters = {}) {
-        const conditions = [];
-        const params = [filters.viewerId || DEMO_USER_ID];
-
-        if (filters.gameId) {
-            params.push(filters.gameId);
-            conditions.push(`lp."id_videogame" = $${params.length}`);
-        }
-
-        if (filters.platform) {
-            params.push(filters.platform.trim());
-            conditions.push(`LOWER(lp."platform") = LOWER($${params.length})`);
-        }
-
-        const whereExtension = conditions.length > 0 ? `  AND ${conditions.join("\n  AND ")}\n` : "";
-        const sql = `${FIND_OPEN_LFG_POSTS_BASE_SQL}${whereExtension}ORDER BY lp."created_at" DESC`;
-
-        const result = await pool.query(sql, params);
-        return result.rows;
+        const viewerId = filters.viewerId || DEMO_USER_ID;
+        const posts = await prisma.lfgPost.findMany({
+            where: {
+                status: "OPEN",
+                User: { account_status: "ACTIVE", ...buildVisibleAccountFilter(viewerId) },
+                Videogames: { status: "ACTIVE" },
+                id_videogame: filters.gameId || undefined,
+                platform: filters.platform ? caseInsensitiveEquals(filters.platform.trim()) : undefined
+            },
+            select: LFG_POST_SELECT,
+            orderBy: { created_at: "desc" }
+        });
+        return posts.map(mapLfgPost);
     }
 
     /**
@@ -453,28 +469,30 @@ function createLfgRepository(pool) {
         description,
         acceptsBeginners
     }) {
-        const gameResult = await pool.query(FIND_ACTIVE_VIDEOGAME_SQL, [videogameId]);
-        if (gameResult.rows.length === 0) {
+        const videogame = await prisma.videogames.findFirst({
+            where: { id_videogame: videogameId, status: "ACTIVE" },
+            select: { id_videogame: true }
+        });
+        if (videogame === null) {
             return null;
         }
 
-        const lfgId = crypto.randomUUID();
         // Replace DEMO_USER_ID with the authenticated user id once auth is implemented.
-        const resolvedUserId = userId || DEMO_USER_ID;
-        const acceptsBeginnersFlag = acceptsBeginners === undefined ? true : Boolean(acceptsBeginners);
-
-        const result = await pool.query(INSERT_LFG_POST_SQL, [
-            lfgId,
-            resolvedUserId,
-            videogameId,
-            platform,
-            spotsAvailable,
-            scheduledTime,
-            description,
-            acceptsBeginnersFlag
-        ]);
-
-        return result.rows[0] || null;
+        const post = await prisma.lfgPost.create({
+            data: {
+                id_lfg: crypto.randomUUID(),
+                id_user: userId || DEMO_USER_ID,
+                id_videogame: videogameId,
+                platform,
+                spots_available: spotsAvailable,
+                scheduled_time: scheduledTime,
+                description,
+                accepts_beginners: acceptsBeginners === undefined ? true : Boolean(acceptsBeginners),
+                status: "OPEN"
+            },
+            select: LFG_POST_SELECT
+        });
+        return mapLfgPost(post);
     }
 
     return {

@@ -265,110 +265,154 @@ describe("commentsRouter", () => {
 describe("commentRepository", () => {
     it("findCommentsByPostId queries active comments for active users and posts", async () => {
         const calls = [];
-        const expectedComments = [
+        const prisma = {
+            comment: {
+                async findMany(args) {
+                    calls.push(args);
+                    return [
+                        {
+                            id_comment: "44444444-4444-4444-8444-444444444444",
+                            id_post: SAMPLE_POST_ID,
+                            content: "Nice!",
+                            is_spoiler: false,
+                            created_at: "2026-01-01T00:00:00.000Z",
+                            User: { username: "gamer1", display_name: "Gamer One" }
+                        }
+                    ];
+                }
+            }
+        };
+
+        const repository = createCommentRepository(prisma);
+        const comments = await repository.findCommentsByPostId(SAMPLE_POST_ID);
+
+        assert.deepEqual(comments, [
             {
                 id_comment: "44444444-4444-4444-8444-444444444444",
                 id_post: SAMPLE_POST_ID,
                 content: "Nice!",
                 is_spoiler: false,
+                created_at: "2026-01-01T00:00:00.000Z",
                 author_username: "gamer1",
                 author_display_name: "Gamer One"
             }
-        ];
-
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                return { rows: expectedComments };
-            }
-        };
-
-        const repository = createCommentRepository(mockPool);
-        const comments = await repository.findCommentsByPostId(SAMPLE_POST_ID);
-
-        assert.deepEqual(comments, expectedComments);
+        ]);
         assert.equal(calls.length, 1);
-        assert.match(calls[0].sql, /FROM "Comment" cm/);
-        assert.match(calls[0].sql, /u\."account_status" = 'ACTIVE'/);
-        assert.match(calls[0].sql, /p\."status" = 'ACTIVE'/);
-        assert.match(calls[0].sql, /ORDER BY cm\."created_at" ASC/);
-        assert.deepEqual(calls[0].params, [SAMPLE_POST_ID, undefined]);
+        assert.equal(calls[0].where.id_post, SAMPLE_POST_ID);
+        assert.deepEqual(calls[0].where.User, { account_status: "ACTIVE" });
+        assert.equal(calls[0].where.Post.status, "ACTIVE");
+        assert.deepEqual(calls[0].where.Post.OR, [
+            { id_community: null },
+            { Communities: { status: "ACTIVE", type: "PUBLIC" } }
+        ]);
+        assert.deepEqual(calls[0].orderBy, { created_at: "asc" });
     });
 
     it("createComment returns null when active post is not found", async () => {
-        const calls = [];
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                return { rows: [] };
+        const lookups = [];
+        const prisma = {
+            post: {
+                async findFirst(args) {
+                    lookups.push(args);
+                    return null;
+                }
+            },
+            comment: {
+                async create() {
+                    assert.fail("create must not run when the post is unavailable");
+                }
             }
         };
 
-        const repository = createCommentRepository(mockPool);
+        const repository = createCommentRepository(prisma);
         const result = await repository.createComment({
             postId: SAMPLE_POST_ID,
             content: "Hello"
         });
 
         assert.equal(result, null);
-        assert.equal(calls.length, 1);
-        assert.match(calls[0].sql, /FROM "Post" p/);
-        assert.match(calls[0].sql, /p\."status" = 'ACTIVE'/);
-        assert.deepEqual(calls[0].params, [SAMPLE_POST_ID, DEMO_USER_ID]);
+        assert.equal(lookups[0].where.id_post, SAMPLE_POST_ID);
+        assert.equal(lookups[0].where.status, "ACTIVE");
+        assert.deepEqual(lookups[0].where.User.OR, [
+            { is_private: false },
+            { id_user: DEMO_USER_ID },
+            { Follows_Follows_id_followedToUser: { some: { id_follower: DEMO_USER_ID } } }
+        ]);
     });
 
     it("createComment inserts with generated UUID and demo user when userId is omitted", async () => {
-        const calls = [];
-        const createdComment = {
-            id_comment: "66666666-6666-4666-8666-666666666666",
+        const creates = [];
+        const prisma = {
+            post: {
+                async findFirst() {
+                    return { id_post: SAMPLE_POST_ID };
+                }
+            },
+            comment: {
+                async create(args) {
+                    creates.push(args);
+                    return {
+                        id_comment: args.data.id_comment,
+                        id_post: SAMPLE_POST_ID,
+                        content: "GG!",
+                        is_spoiler: false,
+                        created_at: "2026-01-01T00:00:00.000Z",
+                        User: { username: "demo", display_name: "Demo Player" }
+                    };
+                }
+            }
+        };
+
+        const repository = createCommentRepository(prisma);
+        const result = await repository.createComment({
+            postId: SAMPLE_POST_ID,
+            content: "GG!"
+        });
+
+        assert.deepEqual(result, {
+            id_comment: creates[0].data.id_comment,
             id_post: SAMPLE_POST_ID,
             content: "GG!",
             is_spoiler: false,
             created_at: "2026-01-01T00:00:00.000Z",
             author_username: "demo",
             author_display_name: "Demo Player"
-        };
-
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                if (sql.includes('FROM "Post" p')) {
-                    return { rows: [{ id_post: SAMPLE_POST_ID }] };
-                }
-                return { rows: [createdComment] };
-            }
-        };
-
-        const repository = createCommentRepository(mockPool);
-        const result = await repository.createComment({
-            postId: SAMPLE_POST_ID,
-            content: "GG!"
         });
-
-        assert.deepEqual(result, createdComment);
-        assert.equal(calls.length, 2);
-        assert.match(calls[1].sql, /INSERT INTO "Comment"/);
-        assert.match(calls[1].sql, /INNER JOIN "User" u ON u\."id_user" = ins\."id_user"/);
-        assert.match(calls[1].params[0], UUID_REGEX);
-        assert.equal(calls[1].params[1], SAMPLE_POST_ID);
-        assert.equal(calls[1].params[2], DEMO_USER_ID);
-        assert.equal(calls[1].params[3], "GG!");
-        assert.equal(calls[1].params[4], false);
+        assert.equal(creates.length, 1);
+        assert.match(creates[0].data.id_comment, UUID_REGEX);
+        assert.deepEqual(creates[0].data, {
+            id_comment: creates[0].data.id_comment,
+            id_post: SAMPLE_POST_ID,
+            id_user: DEMO_USER_ID,
+            content: "GG!",
+            is_spoiler: false
+        });
     });
 
     it("createComment uses explicit userId and isSpoiler when provided", async () => {
-        const calls = [];
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                if (sql.includes('FROM "Post" p')) {
-                    return { rows: [{ id_post: SAMPLE_POST_ID }] };
+        const creates = [];
+        const prisma = {
+            post: {
+                async findFirst() {
+                    return { id_post: SAMPLE_POST_ID };
                 }
-                return { rows: [{ id_comment: "77777777-7777-4777-8777-777777777777" }] };
+            },
+            comment: {
+                async create(args) {
+                    creates.push(args);
+                    return {
+                        id_comment: args.data.id_comment,
+                        id_post: SAMPLE_POST_ID,
+                        content: args.data.content,
+                        is_spoiler: args.data.is_spoiler,
+                        created_at: "2026-01-01T00:00:00.000Z",
+                        User: { username: "player", display_name: null }
+                    };
+                }
             }
         };
 
-        const repository = createCommentRepository(mockPool);
+        const repository = createCommentRepository(prisma);
         await repository.createComment({
             postId: SAMPLE_POST_ID,
             userId: SAMPLE_USER_ID,
@@ -376,9 +420,9 @@ describe("commentRepository", () => {
             isSpoiler: true
         });
 
-        assert.equal(calls.length, 2);
-        assert.equal(calls[1].params[2], SAMPLE_USER_ID);
-        assert.equal(calls[1].params[3], "Spoiler alert");
-        assert.equal(calls[1].params[4], true);
+        assert.equal(creates.length, 1);
+        assert.equal(creates[0].data.id_user, SAMPLE_USER_ID);
+        assert.equal(creates[0].data.content, "Spoiler alert");
+        assert.equal(creates[0].data.is_spoiler, true);
     });
 });

@@ -1,7 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { createApp } = require("../src/app");
-const { createPool } = require("../src/db/pool");
+const { createPrismaClient } = require("../src/db/prisma");
 const {
     DEMO_USER_ID,
     createVideogameRepository
@@ -895,11 +895,11 @@ describe("videogameRepository", () => {
     });
 });
 
-describe("createPool", () => {
-    it("throws an explicit error when connection configuration is missing", () => {
+describe("createPrismaClient", () => {
+    it("should throw an explicit error when DATABASE_URL is missing", () => {
         assert.throws(
-            () => createPool({}),
-            /Missing PostgreSQL connection configuration/
+            () => createPrismaClient({}),
+            /Missing PostgreSQL connection configuration: DATABASE_URL/
         );
     });
 });

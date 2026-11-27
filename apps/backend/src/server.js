@@ -1,4 +1,3 @@
-const { createPool } = require("./db/pool");
 const { createPrismaClient } = require("./db/prisma");
 const { createVideogameRepository } = require("./repositories/videogameRepository");
 const { createCommentRepository } = require("./repositories/commentRepository");
@@ -19,12 +18,11 @@ const { createApp, resolveAllowedOrigin } = require("./app");
  */
 function startServer() {
     const port = Number(process.env.PORT) || 3001;
-    const pool = createPool();
     const prisma = createPrismaClient();
     const videogameRepository = createVideogameRepository(prisma);
-    const commentRepository = createCommentRepository(pool);
+    const commentRepository = createCommentRepository(prisma);
     const reportRepository = createReportRepository(prisma);
-    const lfgRepository = createLfgRepository(pool);
+    const lfgRepository = createLfgRepository(prisma);
     const authRepository = createAuthRepository(prisma);
     const gamerPreferencesRepository = createGamerPreferencesRepository(prisma);
     const followsRepository = createFollowsRepository(prisma);
