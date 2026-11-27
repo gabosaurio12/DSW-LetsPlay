@@ -26,7 +26,7 @@ function startServer() {
     const reportRepository = createReportRepository(pool);
     const lfgRepository = createLfgRepository(pool);
     const authRepository = createAuthRepository(pool);
-    const gamerPreferencesRepository = createGamerPreferencesRepository(pool);
+    const gamerPreferencesRepository = createGamerPreferencesRepository(prisma);
     const followsRepository = createFollowsRepository(pool);
     const blocksRepository = createBlocksRepository(pool);
     const messagesRepository = createMessagesRepository(pool);

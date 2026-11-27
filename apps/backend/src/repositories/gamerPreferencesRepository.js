@@ -1,32 +1,24 @@
 const crypto = require("node:crypto");
 
-const FIND_GAMER_PREFERENCES_SQL = `
-SELECT "favorite_genres", "active_platforms", "availability"
-FROM "GamerPreference"
-WHERE "id_user" = $1
-`;
-
-const UPSERT_GAMER_PREFERENCES_SQL = `
-INSERT INTO "GamerPreference" ("id_preference", "id_user", "favorite_genres", "active_platforms", "availability")
-VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb)
-ON CONFLICT ("id_user") DO UPDATE SET
-    "favorite_genres" = EXCLUDED."favorite_genres",
-    "active_platforms" = EXCLUDED."active_platforms",
-    "availability" = EXCLUDED."availability"
-RETURNING "favorite_genres", "active_platforms", "availability"
-`;
+const PREFERENCE_LIST_SELECT = {
+    favorite_genres: true,
+    active_platforms: true,
+    availability: true
+};
 
 /**
- * Creates the gamer preferences repository. It owns the SQL for GamerPreference.
+ * Creates the gamer preferences repository. It owns access to the GamerPreference table.
  *
- * @param {import("pg").Pool} pool - PostgreSQL connection pool.
+ * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance.
  * @returns {{ findGamerPreferencesByUserId: Function, upsertGamerPreferences: Function }}
  * Gamer preference repository operations.
  */
-function createGamerPreferencesRepository(pool) {
+function createGamerPreferencesRepository(prisma) {
     async function findGamerPreferencesByUserId(userId) {
-        const result = await pool.query(FIND_GAMER_PREFERENCES_SQL, [userId]);
-        return result.rows[0] || null;
+        return prisma.gamerPreference.findUnique({
+            where: { id_user: userId },
+            select: PREFERENCE_LIST_SELECT
+        });
     }
 
     /**
@@ -38,14 +30,22 @@ function createGamerPreferencesRepository(pool) {
      * @returns {Promise<object>} The stored row.
      */
     async function upsertGamerPreferences(userId, preferences) {
-        const result = await pool.query(UPSERT_GAMER_PREFERENCES_SQL, [
-            crypto.randomUUID(),
-            userId,
-            JSON.stringify(preferences.favoriteGenres),
-            JSON.stringify(preferences.activePlatforms),
-            JSON.stringify(preferences.availability)
-        ]);
-        return result.rows[0];
+        const lists = {
+            favorite_genres: preferences.favoriteGenres,
+            active_platforms: preferences.activePlatforms,
+            availability: preferences.availability
+        };
+
+        return prisma.gamerPreference.upsert({
+            where: { id_user: userId },
+            create: {
+                id_preference: crypto.randomUUID(),
+                id_user: userId,
+                ...lists
+            },
+            update: lists,
+            select: PREFERENCE_LIST_SELECT
+        });
     }
 
     return {
