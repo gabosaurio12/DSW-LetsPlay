@@ -13,6 +13,9 @@ Memoria del servidor. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas
 - Moderación: `GET /api/reports`, `PATCH /api/reports/:id` y `POST /api/reports/:id/remove-content` exigen sesión y permiso. Hoy ninguna cuenta tiene permiso (401 sin sesión, 403 con sesión).
 - `npm test`: 123/123 en verde (2026-11-28). Pruebas nuevas: `authRouter.test.js`, `gamerPreferencesRouter.test.js`.
 - Dependencia nueva aprobada: `bcrypt` ^6.
+- Mensajería (2026-11-28, sin commit): `GET /api/messages/conversations`, `GET /api/messages/users/:userId` (historial paginado, orden cronológico dentro de la página) y `POST /api/messages` (201; 403 si falta follow mutuo; 404 si el destinatario no es visible). Archivos: `routes/messagesRouter.js`, `repositories/messagesRepository.js`, `realtime/messageHub.js`.
+- WebSocket `/ws/messages` (paquete `ws`): autentica con la cookie de sesión en el upgrade, exige `Origin` igual a `CORS_ORIGIN` y solo envía `message.created` a los dos participantes.
+- Suite backend: 183/183 (2026-11-28). SQL de mensajería validado contra PostgreSQL temporal con el esquema de `tables.sql`.
 
 ## Decisiones (y por qué)
 - Contraseñas con `bcrypt`, 12 rondas. Máximo 72 bytes UTF-8: bcrypt ignora el resto, así que se rechaza en lugar de truncar.
@@ -35,6 +38,7 @@ Memoria del servidor. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas
 - Pendiente de aplicar la migración `database/migrations/addPrivateAccountsAndFollowRequests.sql` a la DB de desarrollo tras respaldo y coordinación. Se probó en DB temporal.
 - Notificaciones y cambios al feed siguen fuera del alcance. CU-31/32 (mute) también.
 - `POST /api/reports` aún toma `reporterId` del cuerpo; debe usar la sesión.
+- Mensajería: el hub vive en un solo proceso (sin Redis ni broker). Una sesión revocada mantiene el socket abierto hasta cerrarse. Los eventos emitidos mientras el cliente está desconectado no se reenvían; el cliente solo se entera al recargar la página o con el siguiente evento.
 - Alinear las etiquetas de horario de la encuesta con las de LFG (`Afternoons (16:00-19:00)` y similares) antes de producción.
 - Las cuentas de la semilla tienen un hash placeholder que no es bcrypt válido; no pueden iniciar sesión.
 - Migrar la foto de perfil a MongoDB.

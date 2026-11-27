@@ -10,7 +10,19 @@ const { createGamerPreferencesRouter } = require("./routes/gamerPreferencesRoute
 const { createFollowsRouter } = require("./routes/followsRouter");
 const { createBlocksRouter } = require("./routes/blocksRouter");
 const { createPrivacyRouter } = require("./routes/privacyRouter");
+const { createMessagesRouter } = require("./routes/messagesRouter");
 const { createRequireModerator, createOriginGuard } = require("./auth/authMiddleware");
+
+const DEFAULT_ALLOWED_ORIGIN = "http://localhost:5173";
+
+/**
+ * Resolves the frontend origin allowed to make state-changing and socket requests.
+ *
+ * @returns {string} Configured origin or the local development origin.
+ */
+function resolveAllowedOrigin() {
+    return process.env.CORS_ORIGIN || DEFAULT_ALLOWED_ORIGIN;
+}
 
 /**
  * Resolves app dependencies while remaining retrocompatible with callers
@@ -30,6 +42,8 @@ function resolveRepositories(dependencies) {
             gamerPreferencesRepository: dependencies.gamerPreferencesRepository,
             followsRepository: dependencies.followsRepository,
             blocksRepository: dependencies.blocksRepository,
+            messagesRepository: dependencies.messagesRepository,
+            messageHub: dependencies.messageHub,
             requireModerator: dependencies.requireModerator,
             uploadDir: dependencies.uploadDir
         };
@@ -44,6 +58,8 @@ function resolveRepositories(dependencies) {
         gamerPreferencesRepository: undefined,
         followsRepository: undefined,
         blocksRepository: undefined,
+        messagesRepository: undefined,
+        messageHub: undefined,
         requireModerator: undefined,
         uploadDir: undefined
     };
@@ -66,12 +82,14 @@ function createApp(dependencies) {
         gamerPreferencesRepository,
         followsRepository,
         blocksRepository,
+        messagesRepository,
+        messageHub,
         requireModerator,
         uploadDir
     } = resolveRepositories(dependencies);
     const resolvedUploadDir = uploadDir || path.join(__dirname, "../../uploads");
     const app = express();
-    const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+    const allowedOrigin = resolveAllowedOrigin();
     const secureCookies = process.env.NODE_ENV === "production";
 
     app.use(express.json());
@@ -126,6 +144,13 @@ function createApp(dependencies) {
                 createBlocksRouter(authRepository, blocksRepository)
             );
         }
+        if (messagesRepository) {
+            app.use(
+                "/api/messages",
+                originGuard,
+                createMessagesRouter(authRepository, messagesRepository, messageHub)
+            );
+        }
     }
 
     if (reportRepository) {
@@ -154,5 +179,6 @@ function createApp(dependencies) {
 }
 
 module.exports = {
-    createApp
+    createApp,
+    resolveAllowedOrigin
 };

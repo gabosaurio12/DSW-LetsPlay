@@ -478,7 +478,12 @@ function CreateLfgPostModal({ videogames, platformOptions, translate, onClose, o
  * @param {string} [props.initialGameId] - Optional videogame UUID to preselect in the filter.
  * @returns {JSX.Element} The rendered LFG Search page.
  */
-function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} }) {
+function LfgSearch({
+    language,
+    initialGameId = "",
+    onOpenUserProfile = () => {},
+    onOpenMessages = () => {}
+}) {
     const translate = useTranslation(language);
     const [activeTab, setActiveTab] = useState(TABS.PLAYERS);
     const [videogames, setVideogames] = useState([]);
@@ -694,6 +699,12 @@ function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} 
     function handleOpenProfile(playerId) {
         if (UUID_REGEX.test(playerId)) {
             onOpenUserProfile(playerId);
+        }
+    }
+
+    function handleOpenMessages(playerId) {
+        if (UUID_REGEX.test(playerId)) {
+            onOpenMessages(playerId);
         }
     }
 
@@ -1045,7 +1056,7 @@ function LfgSearch({ language, initialGameId = "", onOpenUserProfile = () => {} 
                                     <button
                                         type="button"
                                         className="lfg-btn-primary-sm"
-                                        onClick={() => handleComingSoonAction("lfg.playerCard.messageSoon")}
+                                        onClick={() => handleOpenMessages(playerId)}
                                     >
                                         {translate("lfg.playerCard.sendMessage")}
                                     </button>

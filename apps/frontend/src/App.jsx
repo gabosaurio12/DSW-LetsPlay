@@ -5,6 +5,7 @@ import ExploreGames from "./pages/ExploreGames.jsx";
 import GameDetail from "./pages/GameDetail.jsx";
 import LfgSearch from "./pages/LfgSearch.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
+import Messages from "./pages/Messages.jsx";
 import ModerationPanel from "./pages/ModerationPanel.jsx";
 import LoginForm from "./components/LoginForm.jsx";
 import RegisterForm from "./components/RegisterForm.jsx";
@@ -20,6 +21,7 @@ const VIEWS = {
     LFG: "lfg",
     PROFILE: "profile",
     USER_PROFILE: "userProfile",
+    MESSAGES: "messages",
 };
 
 const ADMIN_ROUTES = new Set(["/admin", "/admin/moderation"]);
@@ -36,7 +38,7 @@ const EXPLORE_NAV_ITEMS = [
     { key: "games", view: VIEWS.EXPLORE },
     { key: "communities", view: null },
     { key: "createCommunity", view: null },
-    { key: "messages", view: null },
+    { key: "messages", view: VIEWS.MESSAGES },
     { key: "profile", view: VIEWS.PROFILE },
 ];
 
@@ -116,6 +118,7 @@ function App() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [profileReturnView, setProfileReturnView] = useState(VIEWS.LFG);
     const [selectedGameId, setSelectedGameId] = useState(null);
+    const [messagePeerId, setMessagePeerId] = useState(null);
     const [lfgPreselectedGameId, setLfgPreselectedGameId] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [libraryGames, setLibraryGames] = useState(loadLibraryGames);
@@ -225,6 +228,16 @@ function App() {
         setSelectedGameId(null);
         setActiveView(VIEWS.USER_PROFILE);
     }, [activeView, profileReturnView]);
+
+    const handleOpenMessages = useCallback((userId) => {
+        if (typeof userId !== "string" || userId.trim() === "") {
+            return;
+        }
+        setMessagePeerId(userId);
+        setSelectedGameId(null);
+        setSelectedUserId(null);
+        setActiveView(VIEWS.MESSAGES);
+    }, []);
 
     function handleFindPlayersForGame(gameId) {
         setLfgPreselectedGameId(gameId || "");
@@ -356,6 +369,17 @@ function App() {
     }
 
     function renderWorkspaceContent() {
+        if (activeView === VIEWS.MESSAGES) {
+            return (
+                <Messages
+                    key={messagePeerId ?? "inbox"}
+                    language={language}
+                    currentUserId={currentUser.id}
+                    initialPeerId={messagePeerId}
+                    onSessionExpired={handleSessionExpired}
+                />
+            );
+        }
         if (activeView === VIEWS.PROFILE) {
             return (
                 <ProfileForm
@@ -375,6 +399,7 @@ function App() {
                     currentUserId={currentUser.id}
                     onBack={() => handleSelectView(profileReturnView)}
                     onOpenProfile={handleOpenUserProfile}
+                    onOpenMessages={handleOpenMessages}
                     onSessionExpired={handleSessionExpired}
                 />
             );
@@ -385,6 +410,7 @@ function App() {
                     language={language}
                     initialGameId={lfgPreselectedGameId}
                     onOpenUserProfile={handleOpenUserProfile}
+                    onOpenMessages={handleOpenMessages}
                 />
             );
         }
