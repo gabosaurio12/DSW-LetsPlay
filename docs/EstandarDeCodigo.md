@@ -4,7 +4,7 @@
 
 **Stack:** React (frontend) · Express.js (backend) · PostgreSQL + MongoDB (persistencia)
 
-**Versión:** 1.0
+**Versión:** 1.1
 
 ---
 
@@ -53,7 +53,7 @@
    - 6.1. Bloques try-catch
    - 6.2. Manejo de errores en código asíncrono
    - 6.3. Middleware de manejo de errores en Express
-   - 6.4. Registro de errores (logging)
+   - 6.4. Registro de errores
 7. Comentarios
    - 7.1. Comentarios de línea única
    - 7.2. Comentarios de bloque
@@ -320,6 +320,7 @@ En TypeScript un prefijo como `I` se considera ruido innecesario, porque el prop
 - Los archivos que exportan **hooks** deben iniciar con `use`, en camelCase: `useFriendsList.js`.
 - Los demás archivos (utilidades, servicios, modelos, controladores, rutas) deben nombrarse en **camelCase** y describir claramente su contenido: `authService.js`, `userController.js`, `postRoutes.js`.
 - Las carpetas se nombran en **camelCase** o en minúsculas separadas por guiones (`kebab-case`), de forma consistente dentro de todo el proyecto.
+- Las carpetas que agrupan un componente de React con sus archivos auxiliares (CSS, subcomponentes) se nombran en **PascalCase**, igual que el componente: `components/ReportModal/`.
 
 **Correcto**
 
@@ -534,7 +535,7 @@ El uso de las siguientes prácticas es extremadamente recomendado y necesario; s
 - Uso de métodos funcionales de arreglos.
   - Deben usarse en lugar de bucles manuales siempre que mejoren la legibilidad (ver sección 4.6).
 - Validación de entradas.
-  - Toda entrada que venga del usuario o del cliente (body, params, query) debe validarse antes de usarse (p. ej. con una librería como Zod o Joi).
+  - Toda entrada que venga del usuario o del cliente (body, params, query) debe validarse de forma explícita antes de usarse (tipo, formato y longitud según el caso).
 
 ## 4.2. Funciones flecha (arrow functions)
 
@@ -940,7 +941,7 @@ for(let i=1;i<=20;i++){
 
 Los errores se deben propagar cuando ocurren en una capa inferior (repositorios, servicios de acceso a datos) y deben capturarse en la capa que los llama y que tiene suficiente contexto para decidir qué responder al cliente (normalmente, el controlador de la ruta en Express).
 
-Todos los errores deben registrarse en la bitácora (logger). Si un error provoca que una petición no pueda completarse, se debe responder al cliente con un código de estado HTTP adecuado y un mensaje claro, sin exponer información sensible ni el stack trace completo.
+Todos los errores del servidor deben registrarse con `console.error`, sin datos sensibles. Si un error provoca que una petición no pueda completarse, se debe responder al cliente con un código de estado HTTP adecuado y un mensaje claro, sin exponer información sensible ni el stack trace completo.
 
 Se evitará capturar `Error` genérico salvo como último recurso en el nivel más externo (por ejemplo, en el middleware global de errores); primero se deben capturar y manejar errores específicos y conocidos del dominio.
 
@@ -955,7 +956,7 @@ try {
     const user = await userRepository.findById(userId);
     return user;
 } catch (error) {
-    logger.error("userService.getUserProfile", error);
+    console.error("userService.getUserProfile", error);
     throw new NotFoundError("User not found");
 }
 ```
@@ -1010,7 +1011,7 @@ El proyecto debe contar con un único middleware de manejo de errores centraliza
 
 ```javascript
 function errorHandler(err, req, res, next) {
-    logger.error(err);
+    console.error(err);
 
     const statusCode = err.statusCode || 500;
     res.status(statusCode).json({
@@ -1033,19 +1034,19 @@ app.use((err, req, res, next) => {
 
 Enviar `err.stack` directamente al cliente expone detalles internos del servidor (rutas de archivos, dependencias, estructura del código) que pueden facilitar un ataque.
 
-## 6.4. Registro de errores (logging)
+## 6.4. Registro de errores
 
-Se debe usar una librería de logging (como **Winston** o **Pino**) en lugar de `console.log`/`console.error` para todo lo que no sea depuración temporal en desarrollo. Se deben respetar los niveles de severidad (`info`, `warn`, `error`) y el logger debe escribir tanto en consola como en un archivo o servicio centralizado de logs.
+Los errores se registran con `console.error`, y la información de estado con `console.info`, para que la severidad quede visible en la salida. `console.log` se reserva para depuración temporal. No se registran contraseñas, tokens ni datos personales.
 
 **Correcto**
 
 ```javascript
-logger.info("Server started on port 3000");
+console.info("Server started on port 3000");
 
 try {
     await db.connect();
 } catch (error) {
-    logger.error("Database connection failed", error);
+    console.error("Database connection failed", error);
 }
 ```
 
@@ -1149,7 +1150,7 @@ function calculateRemainingHealth(currentHp, dealtDamage) {
 
 # Chapter 8. Pruebas
 
-Las pruebas deben escribirse con **Jest** (y **React Testing Library** para componentes de React), y deberán abarcar algunos de los siguientes casos si es que aplican:
+Las pruebas del backend se escriben con el test runner nativo de Node.js (`node:test`), con `node:assert/strict` para las aserciones, y se ejecutan con `npm test`. No se añaden frameworks de pruebas sin aprobación. Deberán abarcar algunos de los siguientes casos si es que aplican:
 
 1. Caso ideal (happy path).
 2. Entradas límite.
@@ -1360,9 +1361,7 @@ TypeScript. (2026). *TypeScript Handbook: Interfaces*. https://www.typescriptlan
 
 JSDoc. (2026). *JSDoc Documentation*. https://jsdoc.app/
 
-Jest. (2026). *Getting Started*. https://jestjs.io/docs/getting-started
-
-Testing Library. (2026). *React Testing Library*. https://testing-library.com/docs/react-testing-library/intro/
+Node.js. (2026). *Test runner*. Node.js Documentation. https://nodejs.org/api/test.html
 
 Chacon, S., & Straub, B. (2014). *Pro Git* (2nd ed.). Apress. https://git-scm.com/book/en/v2/
 
@@ -1377,8 +1376,8 @@ GitHub. (2026). *About pull requests*. GitHub Docs. https://docs.github.com/en/p
 1. Se definió el alcance del estándar a partir del stack del proyecto (React + Express.js, con persistencia en PostgreSQL y MongoDB) y de las 10 secciones solicitadas: introducción, reglas de nombrado, estilos de código, prácticas de programación, estructuras de control, manejo de excepciones, comentarios, pruebas, control de versiones y bibliografía.
 2. Para reglas de nombrado y estilo se adoptaron las convenciones estándar del ecosistema JavaScript/React (camelCase para variables, parámetros, funciones y campos; PascalCase para clases, componentes de React e interfaces/tipos de TypeScript; llaves en la misma línea de la declaración; indentación de 4 espacios), por ser las convenciones más ampliamente adoptadas por guías de estilo como la de Airbnb y por la propia documentación de React.
 3. Para prácticas de programación se incluyeron los mecanismos propios del lenguaje para expresar lógica de forma concisa y segura: funciones flecha, `const`/`let`, async/await, desestructuración/spread y métodos funcionales de arreglos (`map`, `filter`, `reduce`), junto con principios agnósticos al lenguaje (SRP, evitar números mágicos, límite de parámetros, complejidad ciclomática).
-4. Para manejo de excepciones se definió el flujo específico de una aplicación Express: captura con try/catch en funciones asíncronas, propagación con `next(error)`, un middleware centralizado de manejo de errores y registro con una librería de logging (Winston o Pino) en vez de `console.log`.
+4. Para manejo de excepciones se definió el flujo específico de una aplicación Express: captura con try/catch en funciones asíncronas, propagación con `next(error)`, un middleware centralizado de manejo de errores y registro de errores con `console.error`.
 5. Para comentarios se definieron los comentarios de línea, de bloque y la documentación de funciones públicas con JSDoc, con sus etiquetas más comunes (`@param`, `@returns`, `@throws`, `@example`).
-6. Para pruebas y control de versiones se definieron las herramientas concretas del proyecto (Jest y React Testing Library; Git con Conventional Commits y Pull Requests) y los criterios de cobertura y nombrado correspondientes.
-7. Las referencias bibliográficas se seleccionaron de fuentes verificables propias del ecosistema JavaScript/React/Express: la guía de estilo de Airbnb, la documentación oficial de React, Express, TypeScript, JSDoc y Jest, entre otras.
+6. Para pruebas y control de versiones se definieron las herramientas concretas del proyecto (`node:test` para el backend; Git con Conventional Commits y Pull Requests) y los criterios de cobertura y nombrado correspondientes.
+7. Las referencias bibliográficas se seleccionaron de fuentes verificables propias del ecosistema JavaScript/React/Express: la guía de estilo de Airbnb, la documentación oficial de React, Express, TypeScript, JSDoc y Node.js, entre otras.
 8. Se incluyó este anexo con la cadena de razonamiento auditable conforme a la preferencia indicada por el usuario de generarla siempre.
