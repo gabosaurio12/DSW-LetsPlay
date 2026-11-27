@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DEFAULT_LANGUAGE, LANGUAGE_CODES } from "./i18n/i18n.js";
 import { useTranslation } from "./hooks/useTranslation.js";
 import { getCurrentUser, logout } from "./services/authService.js";
@@ -6,12 +6,16 @@ import LoginForm from "./components/LoginForm.jsx";
 import RegisterForm from "./components/RegisterForm.jsx";
 import RecoveryForm from "./components/RecoveryForm.jsx";
 import ProfileForm from "./ProfileForm.jsx";
+import WelcomeSurvey from "./WelcomeSurvey.jsx";
+import { loadWelcomeSurvey } from "./services/welcomeSurveyService.js";
 import "./App.css";
 import "./Auth.css";
 
 /**
  * Root component that orchestrates authentication flows (login, register,
- * recovery, logout) and switches to the main user profile view once authenticated.
+ * recovery, logout). While there is no session it renders the auth views;
+ * once authenticated it enforces the welcome survey when it has not been
+ * completed yet and renders the main user profile view otherwise.
  *
  * @returns {JSX.Element} The rendered application.
  */
@@ -19,16 +23,79 @@ function App() {
   const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
   const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   const [authView, setAuthView] = useState("login");
+  // Null until the stored survey answers of the session are read.
+  const [surveyCompleted, setSurveyCompleted] = useState(null);
   const translate = useTranslation(language);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return undefined;
+    }
+    let isActive = true;
+    const checkSurveyCompletion = async () => {
+      const storedSelection = await loadWelcomeSurvey();
+      if (isActive) {
+        setSurveyCompleted(storedSelection !== null);
+      }
+    };
+    checkSurveyCompletion();
+    return () => {
+      isActive = false;
+    };
+  }, [currentUser]);
 
   const handleLogout = async () => {
     await logout();
     setCurrentUser(null);
+    setSurveyCompleted(null);
     setAuthView("login");
   };
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
+  };
+
+  const handleSurveyCompleted = () => {
+    setSurveyCompleted(true);
+  };
+
+  const renderMainView = () => {
+    if (!currentUser) {
+      return (
+        <div className="auth-view-container">
+          {authView === "login" && (
+            <LoginForm
+              translate={translate}
+              onNavigate={setAuthView}
+              onLoginSuccess={handleLoginSuccess}
+            />
+          )}
+          {authView === "register" && (
+            <RegisterForm
+              translate={translate}
+              onNavigate={setAuthView}
+              onLoginSuccess={handleLoginSuccess}
+            />
+          )}
+          {authView === "recovery" && (
+            <RecoveryForm
+              translate={translate}
+              onNavigate={setAuthView}
+            />
+          )}
+        </div>
+      );
+    }
+    if (surveyCompleted === null) {
+      // The stored answers are read asynchronously before choosing a view.
+      return null;
+    }
+    if (!surveyCompleted) {
+      return (
+        <WelcomeSurvey language={language} onCompleted={handleSurveyCompleted} />
+      );
+    }
+    return <ProfileForm language={language} />;
   };
 
   return (
@@ -77,34 +144,7 @@ function App() {
         </div>
       </header>
 
-      <main className="app-main">
-        {!currentUser ? (
-          <div className="auth-view-container">
-            {authView === "login" && (
-              <LoginForm
-                translate={translate}
-                onNavigate={setAuthView}
-                onLoginSuccess={handleLoginSuccess}
-              />
-            )}
-            {authView === "register" && (
-              <RegisterForm
-                translate={translate}
-                onNavigate={setAuthView}
-                onLoginSuccess={handleLoginSuccess}
-              />
-            )}
-            {authView === "recovery" && (
-              <RecoveryForm
-                translate={translate}
-                onNavigate={setAuthView}
-              />
-            )}
-          </div>
-        ) : (
-          <ProfileForm language={language} />
-        )}
-      </main>
+      <main className="app-main">{renderMainView()}</main>
     </div>
   );
 }

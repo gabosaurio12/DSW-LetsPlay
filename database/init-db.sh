@@ -4,6 +4,7 @@ set -euo pipefail
 CONTAINER_NAME="letsplay"
 DATABASE_NAME="letsplay"
 POSTGRES_PASSWORD="L3tsPl4y"
+LETSPLAY_DB_PORT="${LETSPLAY_DB_PORT:-5432}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
@@ -12,6 +13,7 @@ if docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format '{{.Names}}' | gre
     fi
 else
     docker run -d --name "$CONTAINER_NAME" \
+        -p "127.0.0.1:${LETSPLAY_DB_PORT}:5432" \
         -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
         -e POSTGRES_DB=postgres \
         postgres:16
@@ -50,5 +52,8 @@ docker exec -i "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U postgres -d "$DATABA
 
 docker exec -i "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U postgres -d "$DATABASE_NAME" \
     < "$SCRIPT_DIR/permissions.sql"
+
+docker exec -i "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U postgres -d "$DATABASE_NAME" \
+    < "$SCRIPT_DIR/seed.sql"
 
 echo "Database ${DATABASE_NAME} initialized from database/*.sql"
