@@ -87,5 +87,12 @@
 
 ## Memoria
 - Al empezar, lee `MEMORY.md` de la raíz y el de la carpeta en la que trabajas.
-- Al terminar, actualiza el `MEMORY.md` de la carpeta que tocaste: estado, decisiones con su porqué, y errores a evitar. Máximo ~50 líneas.
+- Al iniciar trabajo en una tarea/rama, verifica si ya existe un `.MEMORY.md` en la carpeta correspondiente (la del AGENTS.md más específico bajo el que estás trabajando):
+  - Si existe, retómalo como contexto de una sesión anterior inconclusa antes de continuar.
+  - Si no existe, créalo como MEMORY temporal de esta tarea.
+- Usa `.MEMORY.md` para notas de trabajo en progreso (decisiones intermedias, intentos fallidos, pendientes). Este archivo está en `.gitignore` y nunca debe commitearse.
+- Al finalizar la tarea, en este orden:
+  1. Revisa `.MEMORY.md` y extrae únicamente lo que deba persistir más allá de esta tarea (ej. una decisión de arquitectura tomada, una convención nueva adoptada, deuda técnica identificada — NO pasos intermedios ni intentos descartados).
+  2. Agrega esas notas a `MEMORY.md` de la carpeta que tocaste, con formato: estado, decisiones con su porqué, y errores a evitar. Máximo ~50 líneas.
+  3. Solo después de confirmar que `MEMORY.md` quedó actualizado correctamente, elimina `.MEMORY.md`.
 - Si algo se vuelve una regla permanente, muévelo a `AGENTS.md` y pide confirmación.
