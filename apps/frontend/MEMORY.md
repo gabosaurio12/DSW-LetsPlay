@@ -3,6 +3,9 @@
 Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 
 ## Estado actual
+- Follows públicos: commit `bcc8e43`. Privacidad y bloqueos (2026-11-27, sin commit): `AccountPrivacySection` en ProfileForm, solicitudes entrantes, toggler privado/público; `UserProfile` con bloquear/desbloquear junto a Follow. LFG, listas, perfil, posts y comentarios consultan estados remotos sin localStorage.
+- Los autores de tarjetas de convocatoria LFG abren perfil con el mismo botón de accesibilidad que los compañeros compatibles.
+- `npm run lint`, `npm run build` y paridad i18n limpios (518 claves por idioma).
 - Auth (fase 2, 2026-11-28): `LoginForm`, `RegisterForm` y `AuthBrand` llaman a `/api/auth/*` con cookie de sesión. La sesión se consulta al arrancar (`fetchCurrentUser`). Recuperación de contraseña retirada hasta el flujo por correo.
 - Preferencias por cuenta: `welcomeSurveyService` usa `/api/me/gamer-preferences`. `WelcomeSurvey` sirve para bienvenida (`mode="onboarding"`) y edición (`mode="edit"`), y `components/GamerPreferencesSection` la abre desde `ProfileForm`.
 - Errores de la encuesta: `loadWelcomeSurvey` lanza error con `status`. 401 cierra sesión; otros fallos muestran reintento.
@@ -31,9 +34,11 @@ Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 - Indentación: varios JSX usan 2 espacios y el estándar exige 4. Se reformatearán más adelante, no antes.
 
 ## Errores a evitar
+- El usuario de sesión de `/api/auth/session` expone `id`, no `id_user`. Los componentes que reciben `currentUserId` desde `App` usan `currentUser.id`.
 - En merges de i18n, el auto-merge de git dejó `profile` anidado dentro de `survey.errors` y un `}}};` final. Tras resolver, comprobar que `en.js` y `es.js` tengan las mismas claves (script de paridad) y no solo que el archivo compile.
 
 ## Próximos pasos
+- Notificaciones/cambios al feed y CU-31/32 (mute) siguen fuera de alcance. Alinear perfil/settings con Figma en una auditoría visual ejecutada.
 - Conectar `profileService` (perfil, foto y biblioteca) al backend.
 - Revisar `ModerationPanel`: sus endpoints responden 401/403 hasta definir permisos.
 - Documentar la encuesta en RF y ajustar `ProfileForm` según esa decisión.

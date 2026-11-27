@@ -270,7 +270,7 @@ describe("lfgRepository", () => {
         assert.deepEqual(result.filters.styles, PLAY_STYLES);
     });
 
-    it("findCompatiblePlayers excludes candidates without shared games even when platforms and availability match", async () => {
+    it("should exclude candidates without shared games when the viewer has a library", async () => {
         const pool = {
             async query(sql) {
                 if (sql.includes("FROM \"GamerPreference\"")) {
@@ -326,6 +326,61 @@ describe("lfgRepository", () => {
         assert.equal(result.players.length, 0);
     });
 
+    it("should return platform and schedule matches when the viewer has no library yet", async () => {
+        const pool = {
+            async query(sql) {
+                if (sql.includes("FROM \"GamerPreference\"")) {
+                    return {
+                        rows: [{
+                            active_platforms: ["PC"],
+                            availability: ["Weeknights"],
+                            preferred_style: "CASUAL",
+                            looking_to_play: true
+                        }]
+                    };
+                }
+                if (sql.includes("WHERE uv.\"id_user\" = $1")) {
+                    return { rows: [] };
+                }
+                if (sql.includes("FROM \"User\" u")) {
+                    return {
+                        rows: [{
+                            id_user: SAMPLE_USER_ID_2,
+                            username: "alex",
+                            display_name: "Alex",
+                            profile_photo_url: null,
+                            favorite_genres: ["RPG"],
+                            active_platforms: ["PC"],
+                            availability: ["Weeknights"],
+                            preferred_style: "CASUAL",
+                            looking_to_play: true
+                        }]
+                    };
+                }
+                if (sql.includes("ANY($1::uuid[])")) {
+                    return {
+                        rows: [{
+                            id_user: SAMPLE_USER_ID_2,
+                            id_videogame: SAMPLE_GAME_ID_2,
+                            name: "Elden Ring"
+                        }]
+                    };
+                }
+                return { rows: [] };
+            }
+        };
+
+        const repository = createLfgRepository(pool);
+        const result = await repository.findCompatiblePlayers();
+
+        assert.equal(result.players.length, 1);
+        assert.equal(result.players[0].id_user, SAMPLE_USER_ID_2);
+        assert.equal(result.players[0].match_percentage, 50);
+        assert.deepEqual(result.players[0].shared_games, []);
+        assert.deepEqual(result.players[0].shared_platforms, ["PC"]);
+        assert.deepEqual(result.players[0].shared_availability, ["Weeknights"]);
+    });
+
     it("findOpenLfgPosts queries open posts with optional gameId and platform filters", async () => {
         const captured = [];
         const pool = {
@@ -340,9 +395,9 @@ describe("lfgRepository", () => {
 
         assert.equal(posts.length, 1);
         assert.ok(captured[0].sql.includes("lp.\"status\" = 'OPEN'"));
-        assert.ok(captured[0].sql.includes("lp.\"id_videogame\" = $1"));
-        assert.ok(captured[0].sql.includes("LOWER(lp.\"platform\") = LOWER($2)"));
-        assert.deepEqual(captured[0].params, [SAMPLE_GAME_ID_1, "PC"]);
+        assert.ok(captured[0].sql.includes("lp.\"id_videogame\" = $2"));
+        assert.ok(captured[0].sql.includes("LOWER(lp.\"platform\") = LOWER($3)"));
+        assert.deepEqual(captured[0].params, [DEMO_USER_ID, SAMPLE_GAME_ID_1, "PC"]);
     });
 
     it("createLfgPost returns null when active videogame is not found", async () => {

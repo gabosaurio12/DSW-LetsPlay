@@ -1,0 +1,203 @@
+.follows-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(20, 20, 20, 0.45);
+}
+
+.follows-modal {
+    width: 100%;
+    max-width: 480px;
+    max-height: 80vh;
+    padding: 24px;
+    overflow: hidden;
+    border-radius: 32px;
+    background: var(--lp-surface);
+    box-shadow: 0 18px 50px rgba(20, 20, 20, 0.18);
+    font-family: var(--lp-font-body);
+}
+
+.follows-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.follows-modal-title {
+    margin: 0;
+    color: var(--lp-text-primary);
+    font-family: var(--lp-font-display);
+    font-size: 24px;
+    line-height: 1.2;
+}
+
+.follows-modal-close {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border: none;
+    border-radius: 50%;
+    background: var(--lp-primary-tint);
+    color: var(--lp-primary);
+    cursor: pointer;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.follows-modal-tabs {
+    display: flex;
+    gap: 24px;
+    margin-top: 20px;
+    border-bottom: 1px solid var(--lp-border);
+}
+
+.follows-modal-tab {
+    padding: 8px 0 12px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--lp-text-secondary);
+    cursor: pointer;
+    font-family: var(--lp-font-display);
+    font-size: 17px;
+}
+
+.follows-modal-tab--active {
+    border-bottom-color: var(--lp-primary);
+    color: var(--lp-text-primary);
+}
+
+.follows-modal-body {
+    max-height: 52vh;
+    overflow-y: auto;
+    padding-top: 8px;
+}
+
+.follows-modal-state {
+    padding: 24px 0;
+    color: var(--lp-text-secondary);
+    text-align: center;
+}
+
+.follows-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0;
+}
+
+.follows-row-identity {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+}
+
+.follows-row-avatar {
+    display: flex;
+    width: 56px;
+    height: 56px;
+    flex: 0 0 56px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--lp-primary-tint);
+    color: var(--lp-primary);
+    font-family: var(--lp-font-display);
+    font-size: 18px;
+}
+
+.follows-row-text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.follows-row-name {
+    overflow: hidden;
+    color: var(--lp-text-primary);
+    font-family: var(--lp-font-display);
+    font-size: 17px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.follows-row-handle {
+    color: var(--lp-text-secondary);
+    font-size: 14px;
+}
+
+.follows-row-self {
+    margin-left: 8px;
+    color: var(--lp-text-secondary);
+    font-size: 14px;
+}
+
+.follows-row-following {
+    flex: 0 0 auto;
+    padding: 10px 20px;
+    border: 1px solid var(--lp-border);
+    border-radius: 999px;
+    background: var(--lp-primary-tint);
+    color: var(--lp-primary);
+    cursor: pointer;
+    font-family: var(--lp-font-display);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.follows-row-confirm {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    color: var(--lp-text-secondary);
+    font-size: 12px;
+    text-align: right;
+}
+
+.follows-row-button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 999px;
+    background: var(--lp-primary);
+    color: var(--lp-surface);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.follows-row-button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.follows-row-button--ghost {
+    background: var(--lp-input-bg);
+    color: var(--lp-text-primary);
+}
+
+.follows-modal-more {
+    display: block;
+    margin: 16px auto 0;
+    padding: 8px 18px;
+    border: 1px solid var(--lp-border);
+    border-radius: 999px;
+    background: var(--lp-surface);
+    color: var(--lp-text-primary);
+    cursor: pointer;
+    font-family: var(--lp-font-display);
+}

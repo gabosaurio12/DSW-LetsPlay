@@ -34,6 +34,15 @@ SELECT u."id_user", u."username", u."display_name", u."description",
        u."profile_photo_url", u."created_at", u."account_status"
 FROM "User" u
 WHERE u."account_status" = 'ACTIVE'
+  AND (
+    NOT u."is_private"
+    OR u."id_user" = current_setting('app.current_user_id', true)::uuid
+    OR EXISTS (
+      SELECT 1 FROM "Follows" f
+      WHERE f."id_follower" = current_setting('app.current_user_id', true)::uuid
+        AND f."id_followed" = u."id_user"
+    )
+  )
   AND NOT EXISTS (
     SELECT 1 FROM "Blocks" b
     WHERE (b."id_blocker" = u."id_user"
@@ -47,6 +56,18 @@ SELECT p."id_post", p."id_user", p."id_videogame", p."id_community",
        p."content", p."image_url", p."is_spoiler", p."created_at", p."updated_at"
 FROM "Post" p
 WHERE p."status" = 'ACTIVE'
+  AND (
+    NOT EXISTS (
+      SELECT 1 FROM "User" u
+      WHERE u."id_user" = p."id_user" AND u."is_private"
+    )
+    OR p."id_user" = current_setting('app.current_user_id', true)::uuid
+    OR EXISTS (
+      SELECT 1 FROM "Follows" f
+      WHERE f."id_follower" = current_setting('app.current_user_id', true)::uuid
+        AND f."id_followed" = p."id_user"
+    )
+  )
   AND (
     p."id_community" IS NULL
     OR EXISTS (
@@ -120,7 +141,19 @@ CREATE VIEW "v_user_gamer_preference" AS
 SELECT p."id_preference", p."id_user", p."favorite_genres", p."active_platforms",
        p."availability", p."preferred_style", p."looking_to_play", p."updated_at"
 FROM "GamerPreference" p
-WHERE NOT EXISTS (
+WHERE (
+  NOT EXISTS (
+    SELECT 1 FROM "User" u
+    WHERE u."id_user" = p."id_user" AND u."is_private"
+  )
+  OR p."id_user" = current_setting('app.current_user_id', true)::uuid
+  OR EXISTS (
+    SELECT 1 FROM "Follows" f
+    WHERE f."id_follower" = current_setting('app.current_user_id', true)::uuid
+      AND f."id_followed" = p."id_user"
+  )
+)
+AND NOT EXISTS (
   SELECT 1 FROM "Blocks" b
   WHERE (b."id_blocker" = p."id_user"
          AND b."id_blocked" = current_setting('app.current_user_id', true)::uuid)
@@ -133,6 +166,18 @@ SELECT l."id_lfg", l."id_user", l."id_videogame", l."platform", l."spots_availab
        l."scheduled_time", l."description", l."accepts_beginners", l."status", l."created_at"
 FROM "LfgPost" l
 WHERE l."status" = 'OPEN'
+  AND (
+    NOT EXISTS (
+      SELECT 1 FROM "User" u
+      WHERE u."id_user" = l."id_user" AND u."is_private"
+    )
+    OR l."id_user" = current_setting('app.current_user_id', true)::uuid
+    OR EXISTS (
+      SELECT 1 FROM "Follows" f
+      WHERE f."id_follower" = current_setting('app.current_user_id', true)::uuid
+        AND f."id_followed" = l."id_user"
+    )
+  )
   AND NOT EXISTS (
     SELECT 1 FROM "Blocks" b
     WHERE (b."id_blocker" = l."id_user"

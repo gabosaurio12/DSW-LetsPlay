@@ -14,6 +14,27 @@ WHERE cm."id_post" = $1
   AND u."account_status" = 'ACTIVE'
   AND p."status" = 'ACTIVE'
   AND (
+      NOT EXISTS (
+          SELECT 1 FROM "User" owner
+          WHERE owner."id_user" = p."id_user" AND owner."is_private"
+      )
+      OR p."id_user" = $2
+      OR EXISTS (
+          SELECT 1 FROM "Follows" f
+          WHERE f."id_follower" = $2 AND f."id_followed" = p."id_user"
+      )
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM "Blocks" b
+      WHERE (b."id_blocker" = p."id_user" AND b."id_blocked" = $2)
+         OR (b."id_blocker" = $2 AND b."id_blocked" = p."id_user")
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM "Blocks" b
+      WHERE (b."id_blocker" = cm."id_user" AND b."id_blocked" = $2)
+         OR (b."id_blocker" = $2 AND b."id_blocked" = cm."id_user")
+  )
+  AND (
       p."id_community" IS NULL
       OR EXISTS (
           SELECT 1
@@ -29,6 +50,22 @@ SELECT p."id_post"
 FROM "Post" p
 WHERE p."id_post" = $1
   AND p."status" = 'ACTIVE'
+  AND (
+      NOT EXISTS (
+          SELECT 1 FROM "User" owner
+          WHERE owner."id_user" = p."id_user" AND owner."is_private"
+      )
+      OR p."id_user" = $2
+      OR EXISTS (
+          SELECT 1 FROM "Follows" f
+          WHERE f."id_follower" = $2 AND f."id_followed" = p."id_user"
+      )
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM "Blocks" b
+      WHERE (b."id_blocker" = p."id_user" AND b."id_blocked" = $2)
+         OR (b."id_blocker" = $2 AND b."id_blocked" = p."id_user")
+  )
 `;
 
 const INSERT_COMMENT_SQL = `
@@ -58,10 +95,11 @@ function createCommentRepository(pool) {
      * Finds active comments for an active post ordered chronologically.
      *
      * @param {string} postId - Post UUID.
+     * @param {string} viewerId - Current account UUID.
      * @returns {Promise<Array<object>>} Matching comments with author metadata.
      */
-    async function findCommentsByPostId(postId) {
-        const result = await pool.query(FIND_COMMENTS_BY_POST_ID_SQL, [postId]);
+    async function findCommentsByPostId(postId, viewerId) {
+        const result = await pool.query(FIND_COMMENTS_BY_POST_ID_SQL, [postId, viewerId]);
         return result.rows;
     }
 
@@ -71,20 +109,22 @@ function createCommentRepository(pool) {
      * @param {{
      *   postId: string,
      *   userId?: string,
+     *   viewerId?: string,
      *   content: string,
      *   isSpoiler?: boolean
      * }} params - Comment creation payload.
-     * @returns {Promise<object|null>} Created comment or null if the post is missing or inactive.
+     * @returns {Promise<object|null>} Created comment or null if the post is unavailable.
      */
-    async function createComment({ postId, userId, content, isSpoiler }) {
-        const postResult = await pool.query(FIND_ACTIVE_POST_SQL, [postId]);
+    async function createComment({ postId, userId, viewerId, content, isSpoiler }) {
+        const resolvedViewerId = viewerId || userId || DEMO_USER_ID;
+        const postResult = await pool.query(FIND_ACTIVE_POST_SQL, [postId, resolvedViewerId]);
         if (postResult.rows.length === 0) {
             return null;
         }
 
         const commentId = crypto.randomUUID();
         // Replace DEMO_USER_ID with the authenticated user id once auth is implemented.
-        const resolvedUserId = userId || DEMO_USER_ID;
+        const resolvedUserId = viewerId || userId || DEMO_USER_ID;
         const spoilerFlag = Boolean(isSpoiler);
 
         const result = await pool.query(INSERT_COMMENT_SQL, [

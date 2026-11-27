@@ -97,6 +97,7 @@ Table User {
   display_name varchar(100)
   description text
   profile_photo_url varchar(500)
+  is_private boolean [not null, default: false]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz
   account_status account_status [not null]
@@ -147,6 +148,24 @@ Table Follows {
 
   checks {
     `id_follower <> id_followed` [name: 'chk_follows_no_self']
+  }
+
+  indexes {
+    id_followed [name: 'idx_follows_id_followed']
+  }
+}
+
+Table FollowRequests {
+  id_follower uuid [pk, not null]
+  id_followed uuid [pk, not null]
+  requested_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `id_follower <> id_followed` [name: 'chk_follow_requests_no_self']
+  }
+
+  indexes {
+    (id_followed, requested_at) [name: 'idx_follow_requests_followed_requested_at']
   }
 }
 
@@ -397,6 +416,8 @@ Ref: UserVideogames.id_user > User.id_user
 Ref: UserVideogames.id_videogame > Videogames.id_videogame
 Ref: Follows.id_follower > User.id_user
 Ref: Follows.id_followed > User.id_user
+Ref: FollowRequests.id_follower > User.id_user
+Ref: FollowRequests.id_followed > User.id_user
 Ref: Blocks.id_blocker > User.id_user
 Ref: Blocks.id_blocked > User.id_user
 Ref: Mutes.id_muter > User.id_user

@@ -7,6 +7,9 @@ const { createLfgRouter } = require("./routes/lfgRouter");
 const { createUploadsRouter } = require("./routes/uploadsRouter");
 const { createAuthRouter } = require("./routes/authRouter");
 const { createGamerPreferencesRouter } = require("./routes/gamerPreferencesRouter");
+const { createFollowsRouter } = require("./routes/followsRouter");
+const { createBlocksRouter } = require("./routes/blocksRouter");
+const { createPrivacyRouter } = require("./routes/privacyRouter");
 const { createRequireModerator, createOriginGuard } = require("./auth/authMiddleware");
 
 /**
@@ -25,6 +28,8 @@ function resolveRepositories(dependencies) {
             lfgRepository: dependencies.lfgRepository,
             authRepository: dependencies.authRepository,
             gamerPreferencesRepository: dependencies.gamerPreferencesRepository,
+            followsRepository: dependencies.followsRepository,
+            blocksRepository: dependencies.blocksRepository,
             requireModerator: dependencies.requireModerator,
             uploadDir: dependencies.uploadDir
         };
@@ -37,6 +42,8 @@ function resolveRepositories(dependencies) {
         lfgRepository: undefined,
         authRepository: undefined,
         gamerPreferencesRepository: undefined,
+        followsRepository: undefined,
+        blocksRepository: undefined,
         requireModerator: undefined,
         uploadDir: undefined
     };
@@ -57,6 +64,8 @@ function createApp(dependencies) {
         lfgRepository,
         authRepository,
         gamerPreferencesRepository,
+        followsRepository,
+        blocksRepository,
         requireModerator,
         uploadDir
     } = resolveRepositories(dependencies);
@@ -69,7 +78,7 @@ function createApp(dependencies) {
 
     app.use((req, res, next) => {
         res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
         if (req.method === "OPTIONS") {
@@ -84,10 +93,13 @@ function createApp(dependencies) {
         res.status(200).json({ ok: true });
     });
 
-    app.use("/api/videogames", createVideogamesRouter(videogameRepository));
+    app.use(
+        "/api/videogames",
+        createVideogamesRouter(videogameRepository, authRepository)
+    );
 
     if (commentRepository) {
-        app.use("/api/posts", createCommentsRouter(commentRepository));
+        app.use("/api/posts", createCommentsRouter(commentRepository, authRepository));
     }
 
     if (authRepository) {
@@ -98,6 +110,22 @@ function createApp(dependencies) {
             originGuard,
             createGamerPreferencesRouter(authRepository, gamerPreferencesRepository)
         );
+        if (followsRepository) {
+            const followsRouter = createFollowsRouter(authRepository, followsRepository);
+            app.use("/api/users", originGuard, followsRouter);
+            app.use(
+                "/api/me/privacy",
+                originGuard,
+                createPrivacyRouter(authRepository, followsRepository)
+            );
+        }
+        if (blocksRepository) {
+            app.use(
+                "/api",
+                originGuard,
+                createBlocksRouter(authRepository, blocksRepository)
+            );
+        }
     }
 
     if (reportRepository) {
@@ -106,7 +134,7 @@ function createApp(dependencies) {
     }
 
     if (lfgRepository) {
-        app.use("/api/lfg", createLfgRouter(lfgRepository));
+        app.use("/api/lfg", createLfgRouter(lfgRepository, authRepository));
     }
 
     app.use("/api/uploads", createUploadsRouter({ uploadDir: resolvedUploadDir }));

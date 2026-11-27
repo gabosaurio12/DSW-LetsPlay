@@ -10,6 +10,9 @@ import { loadProfile, saveProfile, mergeStoredProfile } from "./services/profile
 import { useTranslation } from "./hooks/useTranslation.js";
 import { ProfileField, VideogameGrid, ConfirmedProfilePanel } from "./components/ProfileFormPanels.jsx";
 import GamerPreferencesSection from "./components/GamerPreferencesSection.jsx";
+import FollowListModal from "./components/FollowListModal.jsx";
+import AccountPrivacySection from "./components/AccountPrivacySection.jsx";
+import { fetchUserProfile } from "./services/followService.js";
 import "./ProfileForm.css";
 
 /**
@@ -40,10 +43,12 @@ function getProfileError(profile, translate) {
  *
  * @param {Object} props - The component props.
  * @param {string} props.language - The current application language code.
+ * @param {string} props.currentUserId - The signed-in account uuid.
+ * @param {(userId: string) => void} props.onOpenUserProfile - Opens another account's profile.
  * @param {() => void} [props.onSessionExpired] - Called when the server reports that the session has expired.
  * @returns {JSX.Element} The rendered profile form.
  */
-function ProfileForm({ language, onSessionExpired }) {
+function ProfileForm({ language, currentUserId, onOpenUserProfile, onSessionExpired }) {
   const translate = useTranslation(language);
   const [profile, setProfile] = useState(createEmptyProfile);
   const [savedProfile, setSavedProfile] = useState(null);
@@ -51,6 +56,28 @@ function ProfileForm({ language, onSessionExpired }) {
   const [saveError, setSaveError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [connections, setConnections] = useState({ followers: 0, following: 0 });
+  const [openConnectionList, setOpenConnectionList] = useState(null);
+
+  useEffect(() => {
+    let isActive = true;
+    const controller = new AbortController();
+    fetchUserProfile(currentUserId, { signal: controller.signal })
+      .then((data) => {
+        if (isActive) {
+          setConnections(data.counts || { followers: 0, following: 0 });
+        }
+      })
+      .catch((err) => {
+        if (err.status === 401) {
+          onSessionExpired();
+        }
+      });
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [currentUserId, onSessionExpired]);
 
   useEffect(() => {
     let isActive = true;
@@ -122,6 +149,15 @@ function ProfileForm({ language, onSessionExpired }) {
           onEdit={handleEdit}
         />
         <GamerPreferencesSection language={language} onSessionExpired={onSessionExpired} />
+        <AccountPrivacySection
+          translate={translate}
+          onSessionExpired={onSessionExpired}
+          onOpenUserProfile={onOpenUserProfile}
+          onRequestAccepted={() => setConnections((previous) => ({
+            ...previous,
+            followers: previous.followers + 1
+          }))}
+        />
       </ProfileLayout>
     );
   }
@@ -183,7 +219,47 @@ function ProfileForm({ language, onSessionExpired }) {
           </button>
         </div>
       </section>
+      <div className="profile-connections">
+        <button
+          type="button"
+          className="profile-connections-button"
+          onClick={() => setOpenConnectionList("followers")}
+        >
+          {translate("follows.counts", {
+            followers: connections.followers,
+            following: connections.following
+          })}
+        </button>
+      </div>
       <GamerPreferencesSection language={language} onSessionExpired={onSessionExpired} />
+      <AccountPrivacySection
+        translate={translate}
+        onSessionExpired={onSessionExpired}
+        onOpenUserProfile={onOpenUserProfile}
+        onRequestAccepted={() => setConnections((previous) => ({
+          ...previous,
+          followers: previous.followers + 1
+        }))}
+      />
+      {openConnectionList !== null && (
+        <FollowListModal
+          userId={currentUserId}
+          displayName={translate("follows.selfBadge")}
+          currentUserId={currentUserId}
+          counts={connections}
+          translate={translate}
+          onClose={() => setOpenConnectionList(null)}
+          onOpenProfile={(userId) => {
+            setOpenConnectionList(null);
+            onOpenUserProfile(userId);
+          }}
+          onSessionExpired={onSessionExpired}
+          onUnfollow={() => setConnections((prev) => ({
+            ...prev,
+            followers: Math.max(0, prev.followers - 1)
+          }))}
+        />
+      )}
     </ProfileLayout>
   );
 }

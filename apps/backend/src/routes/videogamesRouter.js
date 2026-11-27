@@ -1,4 +1,5 @@
 const express = require("express");
+const { createRequireSession } = require("../auth/authMiddleware");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_POST_CONTENT_LENGTH = 2000;
@@ -18,8 +19,11 @@ const MAX_IMAGE_URL_LENGTH = 500;
  * }} repository - Videogame repository instance.
  * @returns {import("express").Router} Configured Express router.
  */
-function createVideogamesRouter(repository) {
+function createVideogamesRouter(repository, authRepository) {
     const router = express.Router();
+    const requireSession = authRepository
+        ? createRequireSession(authRepository)
+        : (_req, _res, next) => next();
 
     router.get("/", async (req, res) => {
         const genre = typeof req.query.genre === "string" ? req.query.genre : undefined;
@@ -42,14 +46,17 @@ function createVideogamesRouter(repository) {
     });
 
     // Registered before /:id so "/posts/:postId/comments" is not shadowed.
-    router.get("/posts/:postId/comments", async (req, res) => {
+    router.get("/posts/:postId/comments", requireSession, async (req, res) => {
         const { postId } = req.params;
         if (!UUID_REGEX.test(postId)) {
             res.status(400).json({ error: "Invalid post id" });
             return;
         }
 
-        const comments = await repository.findCommentsByPostId(postId);
+        const comments = await repository.findCommentsByPostId(
+            postId,
+            req.currentUser?.id_user
+        );
         res.status(200).json({ comments });
     });
 
@@ -80,14 +87,17 @@ function createVideogamesRouter(repository) {
         res.status(200).json({ communities });
     });
 
-    router.get("/:id/posts", async (req, res) => {
+    router.get("/:id/posts", requireSession, async (req, res) => {
         const { id } = req.params;
         if (!UUID_REGEX.test(id)) {
             res.status(400).json({ error: "Invalid videogame id" });
             return;
         }
 
-        const posts = await repository.findPublicPostsByVideogameId(id);
+        const posts = await repository.findPublicPostsByVideogameId(
+            id,
+            req.currentUser?.id_user
+        );
         res.status(200).json({ posts });
     });
 

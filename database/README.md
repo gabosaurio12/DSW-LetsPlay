@@ -9,6 +9,7 @@
 | `roles.sql` | Roles de permisos y usuarios de demostración. |
 | `permissions.sql` | Vistas de lectura y concesión de privilegios. |
 | `seed.sql` | Datos iniciales idempotentes del catálogo de videojuegos (`Videogames`). |
+| `migrations/` | Cambios transaccionales para bases ya existentes. |
 
 ## Orden de ejecución
 
@@ -28,6 +29,17 @@ Para desarrollo local con Docker:
 - `bash database/seed-db.sh`: solo poblar o actualizar los datos idempotentes con `seed.sql` sin borrar ni recrear la base de datos (si el contenedor está detenido, lo inicia con `database/start-db.sh`, y al finalizar imprime un resumen de conteos).
 
 `CREATE DATABASE` no puede ejecutarse dentro de una transacción, por eso vive fuera de los scripts y requiere conexión previa a `postgres`. PostgreSQL no admite `IF NOT EXISTS` en `CREATE ROLE`/`CREATE USER`, así que `roles.sql` usa un bloque `DO` que consulta `pg_roles` y puede repetirse sin error.
+
+### Actualizar una base existente
+
+No ejecutes `init-db.sh` para aplicar cambios a una base con datos. Las migraciones de `database/migrations/` se aplican una sola vez con `ON_ERROR_STOP=1`, después de respaldar la base y revisar el efecto de los `DELETE`:
+
+```sh
+psql -U letsplay_admin -d letsplay -v ON_ERROR_STOP=1 \
+  -f database/migrations/addPrivateAccountsAndFollowRequests.sql
+```
+
+Esta migración conserva las cuentas existentes como públicas, crea `FollowRequests` y elimina únicamente relaciones `Follows` entre cuentas que ya se bloqueaban mutuamente en cualquiera de las dos direcciones.
 
 ## Roles
 
@@ -72,6 +84,7 @@ Si no se fija, `current_setting(..., true)` devuelve `NULL` y esas vistas devuel
 ## Integridad en base de datos
 
 - **Checks:** formato alfanumérico de `username` (RN-01), ausencia de autorelaciones en `Follows`/`Blocks`/`Mutes`, publicaciones y comentarios no vacíos (RN-10), coherencia de estados en `VideogameRequests`, `CommunityJoinRequests` y `Report`, y mensajes no vacíos.
+- **Privacidad social:** `User.is_private` es falso por defecto; `Follows` contiene sólo relaciones aprobadas y `FollowRequests` sólo solicitudes pendientes. Bloquear borra follows y solicitudes en ambos sentidos.
 - **FK compuesta** `Post.(id_community, id_videogame) → CommunityVideogames`: impide publicar en un grupo con un juego no vinculado (RN-14). Los posts generales tienen `id_community = NULL` y no se comprueban.
 - **Triggers deferrables** `trg_user_videogame_limit` y `trg_community_videogame_limit`: exigen entre 1 y 5 juegos (RN-06/RN-13). Al ser `INITIALLY DEFERRED`, reemplazar una lista completa en una transacción es válido siempre que el conteo final esté en rango.
 - **`fn_set_updated_at`:** actualiza `updated_at` en `User`, `Post` y `Communities`.
