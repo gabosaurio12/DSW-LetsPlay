@@ -7,6 +7,7 @@ const { createLfgRouter } = require("./routes/lfgRouter");
 const { createUploadsRouter } = require("./routes/uploadsRouter");
 const { createAuthRouter } = require("./routes/authRouter");
 const { createGamerPreferencesRouter } = require("./routes/gamerPreferencesRouter");
+const { createFollowsRouter } = require("./routes/followsRouter");
 const { createRequireModerator, createOriginGuard } = require("./auth/authMiddleware");
 
 /**
@@ -25,6 +26,7 @@ function resolveRepositories(dependencies) {
             lfgRepository: dependencies.lfgRepository,
             authRepository: dependencies.authRepository,
             gamerPreferencesRepository: dependencies.gamerPreferencesRepository,
+            followsRepository: dependencies.followsRepository,
             requireModerator: dependencies.requireModerator,
             uploadDir: dependencies.uploadDir
         };
@@ -37,6 +39,7 @@ function resolveRepositories(dependencies) {
         lfgRepository: undefined,
         authRepository: undefined,
         gamerPreferencesRepository: undefined,
+        followsRepository: undefined,
         requireModerator: undefined,
         uploadDir: undefined
     };
@@ -57,6 +60,7 @@ function createApp(dependencies) {
         lfgRepository,
         authRepository,
         gamerPreferencesRepository,
+        followsRepository,
         requireModerator,
         uploadDir
     } = resolveRepositories(dependencies);
@@ -98,6 +102,10 @@ function createApp(dependencies) {
             originGuard,
             createGamerPreferencesRouter(authRepository, gamerPreferencesRepository)
         );
+        if (followsRepository) {
+            const followsRouter = createFollowsRouter(authRepository, followsRepository);
+            app.use("/api/users", originGuard, followsRouter);
+        }
     }
 
     if (reportRepository) {

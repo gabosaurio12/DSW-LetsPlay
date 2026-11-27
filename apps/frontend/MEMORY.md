@@ -3,6 +3,7 @@
 Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 
 ## Estado actual
+- Follows públicos (fase 3, 2026-11-27, sin commit): `UserProfile` desde LFG y desde las listas; botón de seguir en tarjetas LFG conectado a `/api/users`; `FollowListModal` reutilizado en perfil ajeno y en `ProfileForm`. `followService.js` centraliza las llamadas. Sin localStorage para relaciones. `npm run lint` y `npm run build` limpios; claves es/en pareadas (494).
 - Auth (fase 2, 2026-11-28): `LoginForm`, `RegisterForm` y `AuthBrand` llaman a `/api/auth/*` con cookie de sesión. La sesión se consulta al arrancar (`fetchCurrentUser`). Recuperación de contraseña retirada hasta el flujo por correo.
 - Preferencias por cuenta: `welcomeSurveyService` usa `/api/me/gamer-preferences`. `WelcomeSurvey` sirve para bienvenida (`mode="onboarding"`) y edición (`mode="edit"`), y `components/GamerPreferencesSection` la abre desde `ProfileForm`.
 - Errores de la encuesta: `loadWelcomeSurvey` lanza error con `status`. 401 cierra sesión; otros fallos muestran reintento.
@@ -31,9 +32,11 @@ Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 - Indentación: varios JSX usan 2 espacios y el estándar exige 4. Se reformatearán más adelante, no antes.
 
 ## Errores a evitar
+- El usuario de sesión de `/api/auth/session` expone `id`, no `id_user`. Los componentes que reciben `currentUserId` desde `App` usan `currentUser.id`.
 - En merges de i18n, el auto-merge de git dejó `profile` anidado dentro de `survey.errors` y un `}}};` final. Tras resolver, comprobar que `en.js` y `es.js` tengan las mismas claves (script de paridad) y no solo que el archivo compile.
 
 ## Próximos pasos
+- Siguiente iteración de follows: cuentas restringidas, solicitudes pendientes con aprobación/rechazo/cancelación, visibilidad de listas restringidas, notificaciones y cambios al feed.
 - Conectar `profileService` (perfil, foto y biblioteca) al backend.
 - Revisar `ModerationPanel`: sus endpoints responden 401/403 hasta definir permisos.
 - Documentar la encuesta en RF y ajustar `ProfileForm` según esa decisión.

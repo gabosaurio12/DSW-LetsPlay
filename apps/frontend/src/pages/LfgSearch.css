@@ -371,6 +371,15 @@
     min-width: 0;
 }
 
+.lfg-user-name-button {
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+}
+
 .lfg-user-name {
     margin: 0;
     font-family: var(--lp-font-display);
