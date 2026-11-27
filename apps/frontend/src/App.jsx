@@ -1,19 +1,11 @@
 import { useState } from "react";
 import { DEFAULT_LANGUAGE, LANGUAGE_CODES } from "./i18n/i18n.js";
 import { useTranslation } from "./hooks/useTranslation.js";
-<<<<<<< HEAD
-import WelcomeSurvey from "./WelcomeSurvey.jsx";
-import "./App.css";
-
-/**
- * Application root: renders the welcome survey with a language switch.
-=======
 import ProfileForm from "./ProfileForm.jsx";
 import "./App.css";
 
 /**
  * Application root: renders the profile form with a language switch.
->>>>>>> 109093abbfa6a653ec8acc6ca44973a82d01defb
  *
  * @returns {JSX.Element} The rendered application.
  */
@@ -41,11 +33,7 @@ function App() {
         </div>
       </header>
       <main className="app-main">
-<<<<<<< HEAD
-        <WelcomeSurvey language={language} />
-=======
         <ProfileForm language={language} />
->>>>>>> 109093abbfa6a653ec8acc6ca44973a82d01defb
       </main>
     </div>
   );

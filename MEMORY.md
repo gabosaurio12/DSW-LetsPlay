@@ -21,6 +21,8 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Sin dependencias nuevas ni build steps sin aprobación explícita (Límites en AGENTS.md).
 - Código: comillas dobles, punto y coma, 2 espacios, llaves K&R, componentes PascalCase — eslint del repo limpio y npm run build OK.
 - No usar links absolutos file:/// en los docs.
+- Bug detectado con Chrome DevTools (2026-11-26): `i18n/es.js` e `i18n/en.js` dejan `profile` dentro de `survey.errors` (falta cerrar `errors` y sobra una llave al final), así que la UI muestra claves como `profile.title` y el toggle ES/EN no cambia textos.
+- Bug visual detectado con Chrome DevTools (2026-11-26): `index.css` define tema oscuro `--color-*` pero `App.css` fuerza fondo claro con `--lp-*`; `ProfileForm.css` usa `--color-*`, dejando títulos casi invisibles (contraste 1.08) y chips oscuros con texto oscuro (1.27). Lighthouse a11y 96.
 
 ## Próximos pasos
 - Decidir con el equipo: ¿migrar apps/* a src-client/src-server?
