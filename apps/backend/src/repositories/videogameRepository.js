@@ -1,169 +1,38 @@
-const crypto = require("crypto");
+const crypto = require("node:crypto");
+const {
+    buildVisibleAccountFilter,
+    buildNotBlockedFilter,
+    buildPublicCommunityConditions
+} = require("./visibilityFilters");
 
 // Temporary demo user until authentication is implemented.
 const DEMO_USER_ID = "10000000-0000-4000-8000-000000000001";
 
-const FIND_PUBLIC_VIDEOGAMES_SQL = `
-SELECT "id_videogame", "name", "description", "genre", "platform",
-       "cover_url", "additional_info", "created_at", "status"
-FROM "v_public_videogame"
-WHERE ($1::text IS NULL OR "genre" = $1)
-  AND ($2::text IS NULL OR "platform" = $2)
-  AND (
-      $3::text IS NULL
-      OR "name" ILIKE $3
-      OR "description" ILIKE $3
-  )
-ORDER BY "name" ASC
-`;
+const VIDEOGAME_FIELDS = {
+    id_videogame: true,
+    name: true,
+    description: true,
+    genre: true,
+    platform: true,
+    cover_url: true,
+    additional_info: true,
+    created_at: true,
+    status: true
+};
 
-const FIND_PUBLIC_GENRES_SQL = `
-SELECT DISTINCT "genre"
-FROM "v_public_videogame"
-WHERE "genre" IS NOT NULL
-ORDER BY "genre" ASC
-`;
-
-const FIND_PUBLIC_PLATFORMS_SQL = `
-SELECT DISTINCT "platform"
-FROM "v_public_videogame"
-WHERE "platform" IS NOT NULL
-ORDER BY "platform" ASC
-`;
-
-const FIND_PUBLIC_VIDEOGAME_BY_ID_SQL = `
-SELECT "id_videogame", "name", "description", "genre", "platform",
-       "cover_url", "additional_info", "created_at", "status"
-FROM "v_public_videogame"
-WHERE "id_videogame" = $1
-`;
-
-const FIND_RELATED_COMMUNITIES_BY_VIDEOGAME_ID_SQL = `
-SELECT c."id_community", c."name", c."description", c."type", c."image_url",
-       c."rules", c."created_at", c."updated_at",
-       COUNT(cm."id_user")::int AS "member_count"
-FROM "v_public_community" c
-INNER JOIN "CommunityVideogames" cv ON cv."id_community" = c."id_community"
-LEFT JOIN "CommunityMembers" cm ON cm."id_community" = c."id_community"
-WHERE cv."id_videogame" = $1
-GROUP BY c."id_community", c."name", c."description", c."type", c."image_url",
-         c."rules", c."created_at", c."updated_at"
-ORDER BY "member_count" DESC, c."name" ASC
-`;
-
-const FIND_PUBLIC_POSTS_BY_VIDEOGAME_ID_SQL = `
-SELECT p."id_post", p."id_videogame", v."name" AS "videogame_name",
-       p."id_community", c."name" AS "community_name",
-       p."content", p."image_url", p."is_spoiler", p."created_at",
-       u."username" AS "author_username",
-       u."display_name" AS "author_display_name",
-       COUNT(DISTINCT r."id_user")::int AS "reaction_count",
-       COUNT(DISTINCT cm."id_comment")::int AS "comment_count"
-FROM "Post" p
-INNER JOIN "User" u ON u."id_user" = p."id_user"
-INNER JOIN "Videogames" v ON v."id_videogame" = p."id_videogame"
-LEFT JOIN "v_public_community" c ON c."id_community" = p."id_community"
-LEFT JOIN "Reaction" r ON r."id_post" = p."id_post"
-LEFT JOIN "Comment" cm ON cm."id_post" = p."id_post"
-WHERE p."id_videogame" = $1
-  AND p."status" = 'ACTIVE'
-  AND u."account_status" = 'ACTIVE'
-  AND (
-    NOT u."is_private"
-    OR u."id_user" = $2
-    OR EXISTS (
-      SELECT 1 FROM "Follows" f
-      WHERE f."id_follower" = $2 AND f."id_followed" = u."id_user"
-    )
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM "Blocks" b
-    WHERE (b."id_blocker" = u."id_user" AND b."id_blocked" = $2)
-       OR (b."id_blocker" = $2 AND b."id_blocked" = u."id_user")
-  )
-  AND (
-      p."id_community" IS NULL
-      OR EXISTS (
-          SELECT 1
-          FROM "v_public_community" pc
-          WHERE pc."id_community" = p."id_community"
-      )
-  )
-GROUP BY p."id_post", p."id_videogame", v."name", p."id_community", c."name",
-         p."content", p."image_url", p."is_spoiler", p."created_at",
-         u."username", u."display_name"
-ORDER BY p."created_at" DESC
-`;
-
-const FIND_COMMENTS_BY_POST_ID_SQL = `
-SELECT cm."id_comment", cm."id_post", cm."content", cm."is_spoiler", cm."created_at",
-       u."username" AS "author_username",
-       u."display_name" AS "author_display_name"
-FROM "Comment" cm
-INNER JOIN "User" u ON u."id_user" = cm."id_user"
- INNER JOIN "Post" p ON p."id_post" = cm."id_post"
-WHERE cm."id_post" = $1
-  AND u."account_status" = 'ACTIVE'
-  AND p."status" = 'ACTIVE'
-  AND (
-    NOT EXISTS (
-      SELECT 1 FROM "User" owner
-      WHERE owner."id_user" = p."id_user" AND owner."is_private"
-    )
-    OR p."id_user" = $2
-    OR EXISTS (
-      SELECT 1 FROM "Follows" f
-      WHERE f."id_follower" = $2 AND f."id_followed" = p."id_user"
-    )
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM "Blocks" b
-    WHERE (b."id_blocker" = p."id_user" AND b."id_blocked" = $2)
-       OR (b."id_blocker" = $2 AND b."id_blocked" = p."id_user")
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM "Blocks" b
-    WHERE (b."id_blocker" = cm."id_user" AND b."id_blocked" = $2)
-       OR (b."id_blocker" = $2 AND b."id_blocked" = cm."id_user")
-  )
-  AND (
-      p."id_community" IS NULL
-      OR EXISTS (
-          SELECT 1
-          FROM "v_public_community" c
-          WHERE c."id_community" = p."id_community"
-      )
-  )
-ORDER BY cm."created_at" ASC
-`;
-
-const INSERT_PUBLIC_POST_SQL = `
-WITH inserted AS (
-    INSERT INTO "Post" (
-        "id_post",
-        "id_user",
-        "id_videogame",
-        "id_community",
-        "content",
-        "image_url",
-        "is_spoiler",
-        "status"
-    )
-    VALUES ($1, $2, $3, NULL, $4, $5, $6, 'ACTIVE')
-    RETURNING "id_post", "id_user", "id_videogame", "id_community",
-              "content", "image_url", "is_spoiler", "created_at"
-)
-SELECT ins."id_post", ins."id_videogame", v."name" AS "videogame_name",
-       ins."id_community", NULL::text AS "community_name",
-       ins."content", ins."image_url", ins."is_spoiler", ins."created_at",
-       u."username" AS "author_username",
-       u."display_name" AS "author_display_name",
-       0::int AS "reaction_count",
-       0::int AS "comment_count"
-FROM inserted ins
-INNER JOIN "User" u ON u."id_user" = ins."id_user"
-INNER JOIN "v_public_videogame" v ON v."id_videogame" = ins."id_videogame"
-`;
+const POST_SELECT = {
+    id_post: true,
+    id_videogame: true,
+    id_community: true,
+    content: true,
+    image_url: true,
+    is_spoiler: true,
+    created_at: true,
+    Videogames: { select: { name: true } },
+    Communities: { select: { name: true } },
+    User: { select: { username: true, display_name: true } },
+    _count: { select: { Reaction: true, Comment: true } }
+};
 
 function normalizeFilter(value) {
     if (typeof value !== "string") {
@@ -175,9 +44,91 @@ function normalizeFilter(value) {
 }
 
 /**
- * Creates a repository for querying the public videogame catalog view.
+ * Converts a Prisma post row into the public post shape used by the API.
  *
- * @param {import("pg").Pool} pool - PostgreSQL pool instance.
+ * @param {object} post - Post row selected with POST_SELECT.
+ * @returns {object} Public post with flattened author, videogame and counters.
+ */
+function mapPublicPost(post) {
+    return {
+        id_post: post.id_post,
+        id_videogame: post.id_videogame,
+        videogame_name: post.Videogames.name,
+        id_community: post.id_community,
+        community_name: post.Communities?.name ?? null,
+        content: post.content,
+        image_url: post.image_url,
+        is_spoiler: post.is_spoiler,
+        created_at: post.created_at,
+        author_username: post.User.username,
+        author_display_name: post.User.display_name,
+        reaction_count: post._count.Reaction,
+        comment_count: post._count.Comment
+    };
+}
+
+/**
+ * Converts a Prisma comment row into the public comment shape used by the API.
+ *
+ * @param {object} comment - Comment row with its author selected.
+ * @returns {object} Public comment with flattened author fields.
+ */
+function mapComment(comment) {
+    return {
+        id_comment: comment.id_comment,
+        id_post: comment.id_post,
+        content: comment.content,
+        is_spoiler: comment.is_spoiler,
+        created_at: comment.created_at,
+        author_username: comment.User.username,
+        author_display_name: comment.User.display_name
+    };
+}
+
+/**
+ * Builds the Prisma filter for public videogames with optional filters.
+ *
+ * @param {{ genre: string|null, platform: string|null, search: string|null }} filters - Normalized filters.
+ * @returns {object} Prisma where clause.
+ */
+function buildVideogameWhere({ genre, platform, search }) {
+    return {
+        status: "ACTIVE",
+        genre: genre ?? undefined,
+        platform: platform ?? undefined,
+        OR: search
+            ? [
+                { name: { contains: search, mode: "insensitive" } },
+                { description: { contains: search, mode: "insensitive" } }
+            ]
+            : undefined
+    };
+}
+
+/**
+ * Builds the Prisma filter for public posts of a videogame visible to the viewer.
+ *
+ * @param {string} videogameId - Videogame UUID.
+ * @param {string|null} viewerId - Current account UUID.
+ * @returns {object} Prisma where clause.
+ */
+function buildPublicPostWhere(videogameId, viewerId) {
+    return {
+        id_videogame: videogameId,
+        status: "ACTIVE",
+        User: {
+            account_status: "ACTIVE",
+            ...buildVisibleAccountFilter(viewerId),
+            ...buildNotBlockedFilter(viewerId)
+        },
+        OR: buildPublicCommunityConditions()
+    };
+}
+
+/**
+ * Creates a repository for querying the public videogame catalog.
+ *
+ * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance.
  * @returns {{
  *   findPublicVideogames: Function,
  *   findPublicVideogameFilters: Function,
@@ -188,7 +139,7 @@ function normalizeFilter(value) {
  *   createPublicPostForVideogame: Function
  * }} Videogame repository methods.
  */
-function createVideogameRepository(pool) {
+function createVideogameRepository(prisma) {
     /**
      * Finds public videogames with optional exact genre/platform filters and text search.
      *
@@ -196,18 +147,17 @@ function createVideogameRepository(pool) {
      * @returns {Promise<Array<object>>} Matching public videogames ordered by name.
      */
     async function findPublicVideogames({ genre, platform, search } = {}) {
-        const genreParam = normalizeFilter(genre);
-        const platformParam = normalizeFilter(platform);
         const searchTerm = normalizeFilter(search);
-        const searchParam = searchTerm ? `%${searchTerm}%` : null;
 
-        const result = await pool.query(FIND_PUBLIC_VIDEOGAMES_SQL, [
-            genreParam,
-            platformParam,
-            searchParam
-        ]);
-
-        return result.rows;
+        return prisma.videogames.findMany({
+            where: buildVideogameWhere({
+                genre: normalizeFilter(genre),
+                platform: normalizeFilter(platform),
+                search: searchTerm
+            }),
+            select: VIDEOGAME_FIELDS,
+            orderBy: { name: "asc" }
+        });
     }
 
     /**
@@ -216,14 +166,24 @@ function createVideogameRepository(pool) {
      * @returns {Promise<{ genres: Array<string>, platforms: Array<string> }>} Filter options.
      */
     async function findPublicVideogameFilters() {
-        const [genresResult, platformsResult] = await Promise.all([
-            pool.query(FIND_PUBLIC_GENRES_SQL),
-            pool.query(FIND_PUBLIC_PLATFORMS_SQL)
+        const [genres, platforms] = await Promise.all([
+            prisma.videogames.findMany({
+                where: { status: "ACTIVE", genre: { not: null } },
+                distinct: ["genre"],
+                select: { genre: true },
+                orderBy: { genre: "asc" }
+            }),
+            prisma.videogames.findMany({
+                where: { status: "ACTIVE", platform: { not: null } },
+                distinct: ["platform"],
+                select: { platform: true },
+                orderBy: { platform: "asc" }
+            })
         ]);
 
         return {
-            genres: genresResult.rows.map((row) => row.genre),
-            platforms: platformsResult.rows.map((row) => row.platform)
+            genres: genres.map((row) => row.genre),
+            platforms: platforms.map((row) => row.platform)
         };
     }
 
@@ -234,8 +194,10 @@ function createVideogameRepository(pool) {
      * @returns {Promise<object|null>} Matching videogame or null when not found.
      */
     async function findPublicVideogameById(id) {
-        const result = await pool.query(FIND_PUBLIC_VIDEOGAME_BY_ID_SQL, [id]);
-        return result.rows[0] || null;
+        return prisma.videogames.findFirst({
+            where: { id_videogame: id, status: "ACTIVE" },
+            select: VIDEOGAME_FIELDS
+        });
     }
 
     /**
@@ -245,8 +207,30 @@ function createVideogameRepository(pool) {
      * @returns {Promise<Array<object>>} Related public communities with member counts.
      */
     async function findRelatedCommunitiesByVideogameId(id) {
-        const result = await pool.query(FIND_RELATED_COMMUNITIES_BY_VIDEOGAME_ID_SQL, [id]);
-        return result.rows;
+        const communities = await prisma.communities.findMany({
+            where: {
+                status: "ACTIVE",
+                type: "PUBLIC",
+                CommunityVideogames: { some: { id_videogame: id } }
+            },
+            select: {
+                id_community: true,
+                name: true,
+                description: true,
+                type: true,
+                image_url: true,
+                rules: true,
+                created_at: true,
+                updated_at: true,
+                _count: { select: { CommunityMembers: true } }
+            },
+            orderBy: [{ CommunityMembers: { _count: "desc" } }, { name: "asc" }]
+        });
+
+        return communities.map(({ _count, ...community }) => ({
+            ...community,
+            member_count: _count.CommunityMembers
+        }));
     }
 
     /**
@@ -257,8 +241,13 @@ function createVideogameRepository(pool) {
      * @returns {Promise<Array<object>>} Public posts ordered by newest first.
      */
     async function findPublicPostsByVideogameId(id, viewerId) {
-        const result = await pool.query(FIND_PUBLIC_POSTS_BY_VIDEOGAME_ID_SQL, [id, viewerId]);
-        return result.rows;
+        const posts = await prisma.post.findMany({
+            where: buildPublicPostWhere(id, viewerId),
+            select: POST_SELECT,
+            orderBy: { created_at: "desc" }
+        });
+
+        return posts.map(mapPublicPost);
     }
 
     /**
@@ -269,8 +258,31 @@ function createVideogameRepository(pool) {
      * @returns {Promise<Array<object>>} Post comments ordered oldest first.
      */
     async function findCommentsByPostId(postId, viewerId) {
-        const result = await pool.query(FIND_COMMENTS_BY_POST_ID_SQL, [postId, viewerId]);
-        return result.rows;
+        const comments = await prisma.comment.findMany({
+            where: {
+                id_post: postId,
+                User: { account_status: "ACTIVE", ...buildNotBlockedFilter(viewerId) },
+                Post: {
+                    status: "ACTIVE",
+                    User: {
+                        ...buildVisibleAccountFilter(viewerId),
+                        ...buildNotBlockedFilter(viewerId)
+                    },
+                    OR: buildPublicCommunityConditions()
+                }
+            },
+            select: {
+                id_comment: true,
+                id_post: true,
+                content: true,
+                is_spoiler: true,
+                created_at: true,
+                User: { select: { username: true, display_name: true } }
+            },
+            orderBy: { created_at: "asc" }
+        });
+
+        return comments.map(mapComment);
     }
 
     /**
@@ -286,28 +298,26 @@ function createVideogameRepository(pool) {
      * @returns {Promise<object|null>} Created post or null when the videogame is not found.
      */
     async function createPublicPostForVideogame({ videogameId, userId, content, imageUrl, isSpoiler }) {
-        const videogameResult = await pool.query(FIND_PUBLIC_VIDEOGAME_BY_ID_SQL, [videogameId]);
-        if (videogameResult.rows.length === 0) {
+        const videogame = await findPublicVideogameById(videogameId);
+        if (!videogame) {
             return null;
         }
 
-        const postId = crypto.randomUUID();
         // Replace DEMO_USER_ID with the authenticated user id once auth is implemented.
-        const resolvedUserId = userId || DEMO_USER_ID;
-        const normalizedContent = normalizeFilter(content);
-        const normalizedImageUrl = normalizeFilter(imageUrl);
-        const spoilerFlag = Boolean(isSpoiler);
+        const post = await prisma.post.create({
+            data: {
+                id_post: crypto.randomUUID(),
+                id_user: userId || DEMO_USER_ID,
+                id_videogame: videogameId,
+                content: normalizeFilter(content),
+                image_url: normalizeFilter(imageUrl),
+                is_spoiler: Boolean(isSpoiler),
+                status: "ACTIVE"
+            },
+            select: POST_SELECT
+        });
 
-        const result = await pool.query(INSERT_PUBLIC_POST_SQL, [
-            postId,
-            resolvedUserId,
-            videogameId,
-            normalizedContent,
-            normalizedImageUrl,
-            spoilerFlag
-        ]);
-
-        return result.rows[0] || null;
+        return mapPublicPost(post);
     }
 
     return {
