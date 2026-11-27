@@ -2,12 +2,12 @@
 Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo que ya no aporte.
 
 ## Estado actual
-- Rama activa `Li0` (creada desde `main` con base en commit `8e9aa4c`). Todo el trabajo propio se aísla aquí para evitar conflictos.
-- Estructura: `apps/frontend` (React/Vite con ProfileForm e i18n) y `apps/backend` (Express base); `AGENTS.md` y `MEMORY.md` en raíz; `docs/` y `database/` canónicos.
-- Tareas Trello: 35 terminadas, 7 en V&V, 3 en proceso, 19 en pendientes. De pendientes (Li0 y Todos), las de modelado WAE (#30, #31, #35) y seguridad (#42) ya están cubiertas en docs y SQL.
+- Rama activa `Li0`. Todo el trabajo local se mantiene sin commits ni push según lo solicitado.
+- Frontend: implementadas vistas de Auth (`LoginForm`, `RegisterForm`, `RecoveryForm`, `AuthBrand`), servicio `authService.js` (sesión y persistencia en `localStorage`, seed `seth_play`) y logout en header, respetando prototipos Figma (`#bb8484`, inputs, cards y responsive) e i18n (es/en).
+- Tareas Trello: #48 (registro/login/logout) completada en frontend.
 - Docs canónicos en `docs/`: 1.1.1, 1.1.2, 1.2.1..1.2.5, 1.3.1, 1.3.2, 1.5.1, 1.5.3 y complementarios.
 - `database/`: 22 tablas, 14 enums, 42 FKs, 13 vistas y roles en `roles.sql`/`permissions.sql`.
-- Pendientes inmediatos de Li0: #44/#47 (`README.md`, `.env.example`), #34 (modelo de presentación) y #48 (vistas auth en React).
+- Pendientes inmediatos de Li0: #44/#47 (`README.md`, `.env.example`) y #34 (modelo de presentación).
 
 ## Decisiones (y por qué)
 - Stack: React + Express.js; PostgreSQL (relacional) + MongoDB (archivos/multimedia). Estructura `apps/*` definitiva.
