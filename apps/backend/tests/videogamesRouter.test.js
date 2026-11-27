@@ -1,7 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { createApp } = require("../src/app");
-const { createPool } = require("../src/db/pool");
+const { createPrismaClient } = require("../src/db/prisma");
 const {
     DEMO_USER_ID,
     createVideogameRepository
@@ -529,16 +529,18 @@ describe("videogamesRouter and app", () => {
 });
 
 describe("videogameRepository", () => {
-    it("queries v_public_videogame with parameterized filters", async () => {
+    it("queries public videogames with insensitive search and exact filters", async () => {
         const calls = [];
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                return { rows: [] };
+        const prisma = {
+            videogames: {
+                async findMany(args) {
+                    calls.push(args);
+                    return [];
+                }
             }
         };
 
-        const repository = createVideogameRepository(mockPool);
+        const repository = createVideogameRepository(prisma);
         await repository.findPublicVideogames({
             genre: "RPG",
             platform: "PC",
@@ -546,220 +548,337 @@ describe("videogameRepository", () => {
         });
 
         assert.equal(calls.length, 1);
-        assert.match(calls[0].sql, /FROM "v_public_videogame"/);
-        assert.deepEqual(calls[0].params, ["RPG", "PC", "%Elden%"]);
+        assert.deepEqual(calls[0].where, {
+            status: "ACTIVE",
+            genre: "RPG",
+            platform: "PC",
+            OR: [
+                { name: { contains: "Elden", mode: "insensitive" } },
+                { description: { contains: "Elden", mode: "insensitive" } }
+            ]
+        });
+        assert.deepEqual(calls[0].orderBy, { name: "asc" });
     });
 
-    it("queries v_public_videogame for distinct filters and by id", async () => {
+    it("omits unset videogame filters instead of matching null values", async () => {
         const calls = [];
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                if (sql.includes('DISTINCT "genre"')) {
-                    return { rows: [{ genre: "Action" }] };
+        const prisma = {
+            videogames: {
+                async findMany(args) {
+                    calls.push(args);
+                    return [];
                 }
-                if (sql.includes('DISTINCT "platform"')) {
-                    return { rows: [{ platform: "PC" }] };
-                }
-                return { rows: [{ id_videogame: SAMPLE_ID, name: "Hades" }] };
             }
         };
 
-        const repository = createVideogameRepository(mockPool);
+        const repository = createVideogameRepository(prisma);
+        await repository.findPublicVideogames({ genre: "   ", platform: "" });
+
+        assert.equal(calls[0].where.genre, undefined);
+        assert.equal(calls[0].where.platform, undefined);
+        assert.equal(calls[0].where.OR, undefined);
+        assert.equal(calls[0].where.status, "ACTIVE");
+    });
+
+    it("queries distinct genres and platforms and finds a public videogame by id", async () => {
+        const calls = [];
+        const prisma = {
+            videogames: {
+                async findMany(args) {
+                    calls.push(args);
+                    if (args.distinct[0] === "genre") {
+                        return [{ genre: "Action" }];
+                    }
+                    return [{ platform: "PC" }];
+                },
+                async findFirst(args) {
+                    calls.push(args);
+                    return { id_videogame: SAMPLE_ID, name: "Hades" };
+                }
+            }
+        };
+
+        const repository = createVideogameRepository(prisma);
         const filters = await repository.findPublicVideogameFilters();
         const game = await repository.findPublicVideogameById(SAMPLE_ID);
 
         assert.deepEqual(filters, { genres: ["Action"], platforms: ["PC"] });
         assert.deepEqual(game, { id_videogame: SAMPLE_ID, name: "Hades" });
         assert.equal(calls.length, 3);
-        for (const call of calls) {
-            assert.match(call.sql, /FROM "v_public_videogame"/);
-        }
-        assert.deepEqual(calls[2].params, [SAMPLE_ID]);
+        assert.deepEqual(calls[0].where, { status: "ACTIVE", genre: { not: null } });
+        assert.deepEqual(calls[1].where, { status: "ACTIVE", platform: { not: null } });
+        assert.deepEqual(calls[2].where, { id_videogame: SAMPLE_ID, status: "ACTIVE" });
     });
 
-    it("queries v_public_community for related communities by videogame id", async () => {
+    it("queries public communities related to a videogame and maps member_count", async () => {
         const calls = [];
-        const expectedCommunities = [
+        const prisma = {
+            communities: {
+                async findMany(args) {
+                    calls.push(args);
+                    return [
+                        {
+                            id_community: "22222222-2222-4222-8222-222222222222",
+                            name: "Elden Ring Lore",
+                            _count: { CommunityMembers: 5 }
+                        }
+                    ];
+                }
+            }
+        };
+
+        const repository = createVideogameRepository(prisma);
+        const communities = await repository.findRelatedCommunitiesByVideogameId(SAMPLE_ID);
+
+        assert.deepEqual(communities, [
             {
                 id_community: "22222222-2222-4222-8222-222222222222",
                 name: "Elden Ring Lore",
                 member_count: 5
             }
-        ];
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                return { rows: expectedCommunities };
+        ]);
+        assert.deepEqual(calls[0].where, {
+            status: "ACTIVE",
+            type: "PUBLIC",
+            CommunityVideogames: { some: { id_videogame: SAMPLE_ID } }
+        });
+        assert.deepEqual(calls[0].orderBy, [{ CommunityMembers: { _count: "desc" } }, { name: "asc" }]);
+    });
+
+    it("queries public posts with visibility and block filters and maps counters", async () => {
+        const calls = [];
+        const viewerId = "77777777-7777-4777-8777-777777777777";
+        const prisma = {
+            post: {
+                async findMany(args) {
+                    calls.push(args);
+                    return [
+                        {
+                            id_post: "33333333-3333-4333-8333-333333333333",
+                            id_videogame: SAMPLE_ID,
+                            id_community: null,
+                            content: "Boss tip",
+                            image_url: null,
+                            is_spoiler: false,
+                            created_at: "2026-01-03T00:00:00.000Z",
+                            Videogames: { name: "Elden Ring" },
+                            Communities: null,
+                            User: { username: "gamer", display_name: "Gamer" },
+                            _count: { Reaction: 3, Comment: 1 }
+                        }
+                    ];
+                }
             }
         };
 
-        const repository = createVideogameRepository(mockPool);
-        const communities = await repository.findRelatedCommunitiesByVideogameId(SAMPLE_ID);
+        const repository = createVideogameRepository(prisma);
+        const posts = await repository.findPublicPostsByVideogameId(SAMPLE_ID, viewerId);
 
-        assert.deepEqual(communities, expectedCommunities);
-        assert.equal(calls.length, 1);
-        assert.match(calls[0].sql, /FROM "v_public_community" c/);
-        assert.match(calls[0].sql, /INNER JOIN "CommunityVideogames" cv ON cv\."id_community" = c\."id_community"/);
-        assert.match(calls[0].sql, /LEFT JOIN "CommunityMembers" cm ON cm\."id_community" = c\."id_community"/);
-        assert.match(calls[0].sql, /WHERE cv\."id_videogame" = \$1/);
-        assert.match(calls[0].sql, /COUNT\(cm\."id_user"\)::int AS "member_count"/);
-        assert.match(calls[0].sql, /ORDER BY "member_count" DESC, c\."name" ASC/);
-        assert.deepEqual(calls[0].params, [SAMPLE_ID]);
-    });
-
-    it("queries public posts by videogame id with reaction and comment counts", async () => {
-        const calls = [];
-        const expectedPosts = [
+        assert.deepEqual(posts, [
             {
                 id_post: "33333333-3333-4333-8333-333333333333",
+                id_videogame: SAMPLE_ID,
+                videogame_name: "Elden Ring",
+                id_community: null,
+                community_name: null,
                 content: "Boss tip",
+                image_url: null,
+                is_spoiler: false,
+                created_at: "2026-01-03T00:00:00.000Z",
+                author_username: "gamer",
+                author_display_name: "Gamer",
                 reaction_count: 3,
                 comment_count: 1
             }
-        ];
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                return { rows: expectedPosts };
+        ]);
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0].where.id_videogame, SAMPLE_ID);
+        assert.equal(calls[0].where.status, "ACTIVE");
+        assert.deepEqual(calls[0].where.User, {
+            account_status: "ACTIVE",
+            OR: [
+                { is_private: false },
+                { id_user: viewerId },
+                { Follows_Follows_id_followedToUser: { some: { id_follower: viewerId } } }
+            ],
+            Blocks_Blocks_id_blockerToUser: { none: { id_blocked: viewerId } },
+            Blocks_Blocks_id_blockedToUser: { none: { id_blocker: viewerId } }
+        });
+        assert.deepEqual(calls[0].where.OR, [
+            { id_community: null },
+            { Communities: { status: "ACTIVE", type: "PUBLIC" } }
+        ]);
+        assert.deepEqual(calls[0].orderBy, { created_at: "desc" });
+    });
+
+    it("limits public posts to public accounts when the visitor is anonymous", async () => {
+        const calls = [];
+        const prisma = {
+            post: {
+                async findMany(args) {
+                    calls.push(args);
+                    return [];
+                }
             }
         };
 
-        const repository = createVideogameRepository(mockPool);
-        const posts = await repository.findPublicPostsByVideogameId(SAMPLE_ID);
+        const repository = createVideogameRepository(prisma);
+        await repository.findPublicPostsByVideogameId(SAMPLE_ID, null);
 
-        assert.deepEqual(posts, expectedPosts);
-        assert.equal(calls.length, 1);
-        assert.match(calls[0].sql, /FROM "Post" p/);
-        assert.match(calls[0].sql, /INNER JOIN "User" u ON u\."id_user" = p\."id_user"/);
-        assert.match(calls[0].sql, /INNER JOIN "Videogames" v ON v\."id_videogame" = p\."id_videogame"/);
-        assert.match(calls[0].sql, /LEFT JOIN "v_public_community" c ON c\."id_community" = p\."id_community"/);
-        assert.match(calls[0].sql, /LEFT JOIN "Reaction" r ON r\."id_post" = p\."id_post"/);
-        assert.match(calls[0].sql, /LEFT JOIN "Comment" cm ON cm\."id_post" = p\."id_post"/);
-        assert.match(calls[0].sql, /COUNT\(DISTINCT r\."id_user"\)::int AS "reaction_count"/);
-        assert.match(calls[0].sql, /COUNT\(DISTINCT cm\."id_comment"\)::int AS "comment_count"/);
-        assert.match(calls[0].sql, /p\."status" = 'ACTIVE'/);
-        assert.match(calls[0].sql, /u\."account_status" = 'ACTIVE'/);
-        assert.match(calls[0].sql, /ORDER BY p\."created_at" DESC/);
-        assert.deepEqual(calls[0].params, [SAMPLE_ID, undefined]);
+        assert.deepEqual(calls[0].where.User, {
+            account_status: "ACTIVE",
+            is_private: false
+        });
     });
 
-    it("queries comments by post id for active users and posts", async () => {
+    it("queries comments by post id for active users and visible posts", async () => {
         const calls = [];
-        const expectedComments = [
+        const prisma = {
+            comment: {
+                async findMany(args) {
+                    calls.push(args);
+                    return [
+                        {
+                            id_comment: "44444444-4444-4444-8444-444444444444",
+                            id_post: SAMPLE_ID,
+                            content: "Nice!",
+                            is_spoiler: false,
+                            created_at: "2026-01-04T00:00:00.000Z",
+                            User: { username: "fan", display_name: null }
+                        }
+                    ];
+                }
+            }
+        };
+
+        const repository = createVideogameRepository(prisma);
+        const comments = await repository.findCommentsByPostId(SAMPLE_ID);
+
+        assert.deepEqual(comments, [
             {
                 id_comment: "44444444-4444-4444-8444-444444444444",
                 id_post: SAMPLE_ID,
                 content: "Nice!",
-                is_spoiler: false
+                is_spoiler: false,
+                created_at: "2026-01-04T00:00:00.000Z",
+                author_username: "fan",
+                author_display_name: null
             }
-        ];
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                return { rows: expectedComments };
-            }
-        };
-
-        const repository = createVideogameRepository(mockPool);
-        const comments = await repository.findCommentsByPostId(SAMPLE_ID);
-
-        assert.deepEqual(comments, expectedComments);
+        ]);
         assert.equal(calls.length, 1);
-        assert.match(calls[0].sql, /FROM "Comment" cm/);
-        assert.match(calls[0].sql, /INNER JOIN "User" u ON u\."id_user" = cm\."id_user"/);
-        assert.match(calls[0].sql, /INNER JOIN "Post" p ON p\."id_post" = cm\."id_post"/);
-        assert.match(calls[0].sql, /WHERE cm\."id_post" = \$1/);
-        assert.match(calls[0].sql, /u\."account_status" = 'ACTIVE'/);
-        assert.match(calls[0].sql, /p\."status" = 'ACTIVE'/);
-        assert.match(calls[0].sql, /ORDER BY cm\."created_at" ASC/);
-        assert.deepEqual(calls[0].params, [SAMPLE_ID, undefined]);
+        assert.equal(calls[0].where.id_post, SAMPLE_ID);
+        assert.deepEqual(calls[0].where.User, { account_status: "ACTIVE" });
+        assert.equal(calls[0].where.Post.status, "ACTIVE");
+        assert.deepEqual(calls[0].where.Post.User, { is_private: false });
+        assert.deepEqual(calls[0].orderBy, { created_at: "asc" });
     });
 
     it("createPublicPostForVideogame returns null when videogame is not found", async () => {
-        const calls = [];
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                return { rows: [] };
+        const prisma = {
+            videogames: {
+                async findFirst() {
+                    return null;
+                }
+            },
+            post: {
+                async create() {
+                    assert.fail("create must not run when the videogame is missing");
+                }
             }
         };
 
-        const repository = createVideogameRepository(mockPool);
+        const repository = createVideogameRepository(prisma);
         const post = await repository.createPublicPostForVideogame({
             videogameId: SAMPLE_ID,
             content: "Hello world"
         });
 
         assert.equal(post, null);
-        assert.equal(calls.length, 1);
-        assert.match(calls[0].sql, /FROM "v_public_videogame"/);
-        assert.deepEqual(calls[0].params, [SAMPLE_ID]);
     });
 
-    it("createPublicPostForVideogame inserts into Post with generated UUID and demo user", async () => {
+    it("createPublicPostForVideogame creates a Post with generated UUID and demo user", async () => {
         const calls = [];
-        const createdPost = {
-            id_post: "66666666-6666-4666-8666-666666666666",
-            id_videogame: SAMPLE_ID,
-            videogame_name: "Hollow Knight",
-            id_community: null,
-            community_name: null,
-            content: "Amazing soundtrack",
-            image_url: null,
-            is_spoiler: false,
-            created_at: "2026-01-03T00:00:00.000Z",
-            author_username: "demo",
-            author_display_name: "Demo User",
-            reaction_count: 0,
-            comment_count: 0
-        };
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                if (calls.length === 1) {
-                    return { rows: [{ id_videogame: SAMPLE_ID, name: "Hollow Knight" }] };
+        const prisma = {
+            videogames: {
+                async findFirst() {
+                    return { id_videogame: SAMPLE_ID, name: "Hollow Knight" };
                 }
-                return { rows: [createdPost] };
+            },
+            post: {
+                async create(args) {
+                    calls.push(args);
+                    return {
+                        id_post: args.data.id_post,
+                        id_videogame: SAMPLE_ID,
+                        id_community: null,
+                        content: "Amazing soundtrack",
+                        image_url: null,
+                        is_spoiler: false,
+                        created_at: "2026-01-03T00:00:00.000Z",
+                        Videogames: { name: "Hollow Knight" },
+                        Communities: null,
+                        User: { username: "demo", display_name: "Demo User" },
+                        _count: { Reaction: 0, Comment: 0 }
+                    };
+                }
             }
         };
 
-        const repository = createVideogameRepository(mockPool);
+        const repository = createVideogameRepository(prisma);
         const post = await repository.createPublicPostForVideogame({
             videogameId: SAMPLE_ID,
             content: "Amazing soundtrack"
         });
 
-        assert.deepEqual(post, createdPost);
-        assert.equal(calls.length, 2);
-        assert.match(calls[0].sql, /FROM "v_public_videogame"/);
-        assert.match(calls[1].sql, /INSERT INTO "Post"/);
-        assert.match(calls[1].sql, /VALUES \(\$1, \$2, \$3, NULL, \$4, \$5, \$6, 'ACTIVE'\)/);
+        assert.equal(post.videogame_name, "Hollow Knight");
+        assert.equal(post.community_name, null);
+        assert.equal(post.reaction_count, 0);
+        assert.equal(calls.length, 1);
         assert.match(
-            calls[1].params[0],
+            calls[0].data.id_post,
             /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
         );
-        assert.equal(calls[1].params[1], DEMO_USER_ID);
-        assert.equal(calls[1].params[2], SAMPLE_ID);
-        assert.equal(calls[1].params[3], "Amazing soundtrack");
-        assert.equal(calls[1].params[4], null);
-        assert.equal(calls[1].params[5], false);
+        assert.deepEqual(calls[0].data, {
+            id_post: calls[0].data.id_post,
+            id_user: DEMO_USER_ID,
+            id_videogame: SAMPLE_ID,
+            content: "Amazing soundtrack",
+            image_url: null,
+            is_spoiler: false,
+            status: "ACTIVE"
+        });
     });
 
     it("createPublicPostForVideogame uses explicit userId, imageUrl, and isSpoiler when provided", async () => {
         const calls = [];
         const customUserId = "77777777-7777-4777-8777-777777777777";
-        const mockPool = {
-            async query(sql, params) {
-                calls.push({ sql, params });
-                if (calls.length === 1) {
-                    return { rows: [{ id_videogame: SAMPLE_ID, name: "Celeste" }] };
+        const prisma = {
+            videogames: {
+                async findFirst() {
+                    return { id_videogame: SAMPLE_ID, name: "Celeste" };
                 }
-                return { rows: [{ id_post: params[0], id_videogame: SAMPLE_ID }] };
+            },
+            post: {
+                async create(args) {
+                    calls.push(args);
+                    return {
+                        id_post: args.data.id_post,
+                        id_videogame: SAMPLE_ID,
+                        id_community: null,
+                        content: null,
+                        image_url: "https://example.com/celeste.png",
+                        is_spoiler: true,
+                        created_at: "2026-01-03T00:00:00.000Z",
+                        Videogames: { name: "Celeste" },
+                        Communities: null,
+                        User: { username: "custom", display_name: null },
+                        _count: { Reaction: 0, Comment: 0 }
+                    };
+                }
             }
         };
 
-        const repository = createVideogameRepository(mockPool);
+        const repository = createVideogameRepository(prisma);
         await repository.createPublicPostForVideogame({
             videogameId: SAMPLE_ID,
             userId: customUserId,
@@ -768,20 +887,19 @@ describe("videogameRepository", () => {
             isSpoiler: true
         });
 
-        assert.equal(calls.length, 2);
-        assert.equal(calls[1].params[1], customUserId);
-        assert.equal(calls[1].params[2], SAMPLE_ID);
-        assert.equal(calls[1].params[3], null);
-        assert.equal(calls[1].params[4], "https://example.com/celeste.png");
-        assert.equal(calls[1].params[5], true);
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0].data.id_user, customUserId);
+        assert.equal(calls[0].data.content, null);
+        assert.equal(calls[0].data.image_url, "https://example.com/celeste.png");
+        assert.equal(calls[0].data.is_spoiler, true);
     });
 });
 
-describe("createPool", () => {
-    it("throws an explicit error when connection configuration is missing", () => {
+describe("createPrismaClient", () => {
+    it("should throw an explicit error when DATABASE_URL is missing", () => {
         assert.throws(
-            () => createPool({}),
-            /Missing PostgreSQL connection configuration/
+            () => createPrismaClient({}),
+            /Missing PostgreSQL connection configuration: DATABASE_URL/
         );
     });
 });

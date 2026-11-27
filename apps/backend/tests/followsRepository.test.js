@@ -6,233 +6,339 @@ const VIEWER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_ID = "22222222-2222-4222-8222-222222222222";
 const THIRD_ID = "33333333-3333-4333-8333-333333333333";
 
-function createFakePool() {
-    const state = {
-        users: new Map(),
-        blocks: [],
-        follows: new Set(),
-        requests: new Set(),
-        queries: []
-    };
-    const pool = {
-        async query(sql, params) {
-            state.queries.push({ sql, params });
-            if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql.trim())
-                || sql.includes('FOR UPDATE')) {
-                return { rows: [], rowCount: 0 };
+const NOT_BLOCKED_FILTER = {
+    Blocks_Blocks_id_blockerToUser: { none: { id_blocked: VIEWER_ID } },
+    Blocks_Blocks_id_blockedToUser: { none: { id_blocker: VIEWER_ID } }
+};
+
+function createFakePrisma(overrides = {}) {
+    const prisma = {
+        user: {
+            async findFirst() {
+                return null;
+            },
+            async update() {
+                throw Object.assign(new Error("Record not found"), { code: "P2025" });
             }
-            if (sql.includes('SELECT "is_private" FROM "User"')) {
-                const user = state.users.get(params[0]);
-                const rows = user ? [{ is_private: Boolean(user.is_private) }] : [];
-                return { rows, rowCount: rows.length };
-            }
-            if (sql.trimStart().startsWith('SELECT 1 FROM "Blocks"')) {
-                const blocked = isBlocked(state, params[0], params[1]);
-                return { rows: blocked ? [{}] : [], rowCount: blocked ? 1 : 0 };
-            }
-            if (sql.includes('AS "pending"')) {
-                return {
-                    rows: [{
-                        following: state.follows.has(`${params[0]}|${params[1]}`),
-                        pending: state.requests.has(`${params[0]}|${params[1]}`)
-                    }]
-                };
-            }
-            if (sql.includes('INSERT INTO "FollowRequests"')) {
-                const key = `${params[0]}|${params[1]}`;
-                state.requests.add(key);
-                return { rows: [{ id_follower: params[0] }], rowCount: 1 };
-            }
-            if (sql.includes('DELETE FROM "FollowRequests"')) {
-                const key = `${params[0]}|${params[1]}`;
-                const deleted = state.requests.delete(key);
-                return { rows: [], rowCount: deleted ? 1 : 0 };
-            }
-            if (sql.includes("UPDATE \"User\" SET")) {
-                const user = state.users.get(params[0]);
-                if (user) {
-                    user.is_private = params[1];
-                }
-                return { rows: user ? [{ is_private: params[1] }] : [], rowCount: user ? 1 : 0 };
-            }
-            if (sql.includes('AS "followers"')) {
-                return { rows: [stateCounts(state, params[0], params[1])] };
-            }
-            if (sql.includes("ANY($2::uuid[])")) {
-                const relationships = sql.includes('"FollowRequests"')
-                    ? state.requests
-                    : state.follows;
-                return { rows: params[1]
-                    .filter((id) => relationships.has(`${params[0]}|${id}`))
-                    .map((id) => ({ id_followed: id })) };
-            }
-            if (sql.includes("SELECT EXISTS")) {
-                return {
-                    rows: [{ following: state.follows.has(`${params[0]}|${params[1]}`) }]
-                };
-            }
-            if (sql.includes('INSERT INTO "Follows"')) {
-                return insertFollow(state, params);
-            }
-            if (sql.includes('DELETE FROM "Follows"')) {
-                const key = `${params[0]}|${params[1]}`;
-                const deleted = state.follows.delete(key);
-                const rows = deleted ? [{ id_follower: params[0] }] : [];
-                return { rows, rowCount: rows.length };
-            }
-            if (sql.includes("FROM \"Follows\" f")) {
-                const isFollowers = sql.includes('WHERE f."id_followed" = $1');
-                return { rows: listFollows(state, params, isFollowers) };
-            }
-            return { rows: findUsers(state, params), rowCount: 0 };
         },
-        async connect() {
-            return { query: pool.query, release() {} };
+        follows: {
+            async findUnique() {
+                return null;
+            },
+            async findMany() {
+                return [];
+            },
+            async count() {
+                return 0;
+            },
+            async createMany() {
+                return { count: 0 };
+            },
+            async deleteMany() {
+                return { count: 0 };
+            }
+        },
+        followRequests: {
+            async findUnique() {
+                return null;
+            },
+            async findMany() {
+                return [];
+            },
+            async count() {
+                return 0;
+            },
+            async createMany() {
+                return { count: 0 };
+            },
+            async deleteMany() {
+                return { count: 0 };
+            }
+        },
+        blocks: {
+            async findFirst() {
+                return null;
+            }
+        },
+        async $queryRaw() {
+            return [];
         }
     };
-    return { pool, state };
-}
 
-function isBlocked(state, firstId, secondId) {
-    return state.blocks.some((block) =>
-        (block.blocker === firstId && block.blocked === secondId)
-        || (block.blocker === secondId && block.blocked === firstId)
-    );
-}
-
-function findUsers(state, params) {
-    const [userId, viewerId] = params;
-    const user = state.users.get(userId);
-    if (!user || user.account_status !== "ACTIVE" || isBlocked(state, userId, viewerId)) {
-        return [];
+    for (const [model, methods] of Object.entries(overrides)) {
+        if (model === "$queryRaw") {
+            prisma.$queryRaw = methods;
+        } else {
+            prisma[model] = { ...prisma[model], ...methods };
+        }
     }
-    return [user];
-}
-
-function stateCounts(state, userId, viewerId) {
-    const visibleFollowers = [...state.follows]
-        .filter((key) => key.endsWith(`|${userId}`))
-        .map((key) => key.split("|")[0])
-        .filter((id) => state.users.get(id)?.account_status === "ACTIVE")
-        .filter((id) => !isBlocked(state, id, viewerId)).length;
-    const visibleFollowing = [...state.follows]
-        .filter((key) => key.startsWith(`${userId}|`))
-        .map((key) => key.split("|")[1])
-        .filter((id) => state.users.get(id)?.account_status === "ACTIVE")
-        .filter((id) => !isBlocked(state, id, viewerId)).length;
-    return { followers: String(visibleFollowers), following: String(visibleFollowing) };
-}
-
-function insertFollow(state, params) {
-    const [followerId, followedId] = params;
-    const target = state.users.get(followedId);
-    const allowed = followerId !== followedId
-        && target?.account_status === "ACTIVE"
-        && !isBlocked(state, followerId, followedId)
-        && !state.follows.has(`${followerId}|${followedId}`);
-    if (!allowed) {
-        return { rows: [], rowCount: 0 };
-    }
-    state.follows.add(`${followerId}|${followedId}`);
-    return { rows: [{ id_follower: followerId }], rowCount: 1 };
-}
-
-function listFollows(state, params, isFollowers) {
-    const [userId, viewerId, limit, offset] = params;
-    return [...state.follows]
-        .filter((key) => isFollowers ? key.endsWith(`|${userId}`) : key.startsWith(`${userId}|`))
-        .map((key) => state.users.get(isFollowers ? key.split("|")[0] : key.split("|")[1]))
-        .filter((user) => user?.account_status === "ACTIVE")
-        .filter((user) => !isBlocked(state, user.id_user, viewerId))
-        .sort((a, b) => a.username.localeCompare(b.username))
-        .slice(offset, offset + limit);
-}
-
-function seed() {
-    const { pool, state } = createFakePool();
-    state.users.set(VIEWER_ID, {
-        id_user: VIEWER_ID, username: "viewer", account_status: "ACTIVE"
-    });
-    state.users.set(OTHER_ID, { id_user: OTHER_ID, username: "ana", account_status: "ACTIVE" });
-    state.users.set(THIRD_ID, { id_user: THIRD_ID, username: "luis", account_status: "ACTIVE" });
-    return { repository: createFollowsRepository(pool), state };
+    prisma.$transaction = async (work) => work(prisma);
+    return prisma;
 }
 
 describe("followsRepository", () => {
-    it("should not return a profile blocked with the viewer", async () => {
-        const { repository, state } = seed();
-        state.blocks.push({ blocker: OTHER_ID, blocked: VIEWER_ID });
-        assert.equal(await repository.findVisibleUser(OTHER_ID, VIEWER_ID), null);
+    it("should filter out a profile blocked with the viewer when reading it", async () => {
+        const queries = [];
+        const prisma = createFakePrisma({
+            user: {
+                async findFirst(args) {
+                    queries.push(args);
+                    return null;
+                }
+            }
+        });
+
+        const profile = await createFollowsRepository(prisma).findVisibleUser(OTHER_ID, VIEWER_ID);
+
+        assert.equal(profile, null);
+        assert.equal(queries[0].where.id_user, OTHER_ID);
+        assert.equal(queries[0].where.account_status, "ACTIVE");
+        assert.deepEqual(queries[0].where.Blocks_Blocks_id_blockerToUser, NOT_BLOCKED_FILTER.Blocks_Blocks_id_blockerToUser);
+        assert.deepEqual(queries[0].where.Blocks_Blocks_id_blockedToUser, NOT_BLOCKED_FILTER.Blocks_Blocks_id_blockedToUser);
     });
 
-    it("should not return an inactive profile", async () => {
-        const { repository, state } = seed();
-        state.users.get(OTHER_ID).account_status = "SUSPENDED";
-        assert.equal(await repository.findVisibleUser(OTHER_ID, VIEWER_ID), null);
+    it("should reject self follows when the target account is public", async () => {
+        const createCalls = [];
+        const prisma = createFakePrisma({
+            user: {
+                async findFirst() {
+                    return { is_private: false };
+                }
+            },
+            follows: {
+                async createMany(args) {
+                    createCalls.push(args);
+                    return { count: 1 };
+                }
+            }
+        });
+
+        const result = await createFollowsRepository(prisma).addFollow(OTHER_ID, OTHER_ID);
+
+        assert.equal(result, null);
+        assert.equal(createCalls.length, 0);
     });
 
-    it("should reject self follows and duplicate relationships", async () => {
-        const { repository } = seed();
-        assert.equal(await repository.addFollow(OTHER_ID, OTHER_ID), null);
-        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), "following");
-        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), "following");
+    it("should report the existing state when the relationship is already stored", async () => {
+        const prisma = createFakePrisma({
+            user: {
+                async findFirst() {
+                    return { is_private: false };
+                }
+            },
+            follows: {
+                async findUnique() {
+                    return { id_follower: VIEWER_ID };
+                }
+            }
+        });
+
+        const result = await createFollowsRepository(prisma).addFollow(VIEWER_ID, OTHER_ID);
+
+        assert.equal(result, "following");
     });
 
-    it("should cast the insert parameters to uuid", async () => {
-        const { repository, state } = seed();
-        await repository.addFollow(VIEWER_ID, OTHER_ID);
-        const insert = state.queries.find((entry) => entry.sql.includes("INSERT INTO"));
-        assert.ok(insert.sql.includes("$1::uuid") && insert.sql.includes("$2::uuid"));
-    });
+    it("should insert follows with skipDuplicates so concurrent duplicates are ignored", async () => {
+        const createCalls = [];
+        const prisma = createFakePrisma({
+            user: {
+                async findFirst() {
+                    return { is_private: false };
+                }
+            },
+            follows: {
+                async createMany(args) {
+                    createCalls.push(args);
+                    return { count: 1 };
+                }
+            }
+        });
 
-    it("should reject follows between blocked accounts", async () => {
-        const { repository, state } = seed();
-        state.blocks.push({ blocker: OTHER_ID, blocked: VIEWER_ID });
-        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), null);
-    });
+        const result = await createFollowsRepository(prisma).addFollow(VIEWER_ID, OTHER_ID);
 
-    it("should return only the batch ids followed by the viewer", async () => {
-        const { repository } = seed();
-        await repository.addFollow(VIEWER_ID, OTHER_ID);
-        const followed = await repository.findFollowStates(VIEWER_ID, [OTHER_ID, THIRD_ID]);
-        assert.deepEqual(followed, [OTHER_ID]);
-    });
-
-    it("should count only visible relationships", async () => {
-        const { repository, state } = seed();
-        state.follows.add(`${VIEWER_ID}|${OTHER_ID}`);
-        state.follows.add(`${OTHER_ID}|${VIEWER_ID}`);
-        state.follows.add(`${THIRD_ID}|${VIEWER_ID}`);
-        state.blocks.push({ blocker: THIRD_ID, blocked: VIEWER_ID });
-        assert.deepEqual(await repository.countFollows(VIEWER_ID, VIEWER_ID), {
-            followers: 1,
-            following: 1
+        assert.equal(result, "following");
+        assert.deepEqual(createCalls[0], {
+            data: [{ id_follower: VIEWER_ID, id_followed: OTHER_ID }],
+            skipDuplicates: true
         });
     });
 
+    it("should reject follows between blocked accounts", async () => {
+        const prisma = createFakePrisma({
+            user: {
+                async findFirst() {
+                    return { is_private: false };
+                }
+            },
+            blocks: {
+                async findFirst() {
+                    return { id_blocker: OTHER_ID };
+                }
+            }
+        });
+
+        const result = await createFollowsRepository(prisma).addFollow(VIEWER_ID, OTHER_ID);
+
+        assert.equal(result, null);
+    });
+
+    it("should return only the batch ids followed by the viewer", async () => {
+        const queries = [];
+        const prisma = createFakePrisma({
+            follows: {
+                async findMany(args) {
+                    queries.push(args);
+                    return [{ id_followed: OTHER_ID }];
+                }
+            }
+        });
+
+        const followed = await createFollowsRepository(prisma).findFollowStates(VIEWER_ID, [OTHER_ID, THIRD_ID]);
+
+        assert.deepEqual(followed, [OTHER_ID]);
+        assert.deepEqual(queries[0].where, {
+            id_follower: VIEWER_ID,
+            id_followed: { in: [OTHER_ID, THIRD_ID] }
+        });
+    });
+
+    it("should count only relationships with active accounts that are not blocked", async () => {
+        const counts = [];
+        const prisma = createFakePrisma({
+            follows: {
+                async count(args) {
+                    counts.push(args);
+                    return 1;
+                }
+            }
+        });
+
+        const totals = await createFollowsRepository(prisma).countFollows(VIEWER_ID, VIEWER_ID);
+
+        assert.deepEqual(totals, { followers: 1, following: 1 });
+        assert.equal(counts.length, 2);
+        assert.equal(counts[0].where.id_followed, VIEWER_ID);
+        assert.equal(counts[0].where.User_Follows_id_followerToUser.account_status, "ACTIVE");
+        assert.deepEqual(
+            counts[0].where.User_Follows_id_followerToUser.Blocks_Blocks_id_blockerToUser,
+            NOT_BLOCKED_FILTER.Blocks_Blocks_id_blockerToUser
+        );
+        assert.equal(counts[1].where.id_follower, VIEWER_ID);
+    });
+
     it("should exclude blocked third parties from the follower list", async () => {
-        const { repository, state } = seed();
-        state.follows.add(`${VIEWER_ID}|${OTHER_ID}`);
-        state.follows.add(`${THIRD_ID}|${OTHER_ID}`);
-        state.blocks.push({ blocker: THIRD_ID, blocked: VIEWER_ID });
-        const users = await repository.listFollowers(OTHER_ID, VIEWER_ID, 20, 0);
+        const queries = [];
+        const prisma = createFakePrisma({
+            follows: {
+                async findMany(args) {
+                    queries.push(args);
+                    return [{ User_Follows_id_followerToUser: { id_user: VIEWER_ID, username: "viewer" } }];
+                }
+            }
+        });
+
+        const users = await createFollowsRepository(prisma).listFollowers(OTHER_ID, VIEWER_ID, 20, 0);
+
         assert.deepEqual(users.map((user) => user.username), ["viewer"]);
+        assert.equal(queries[0].where.id_followed, OTHER_ID);
+        assert.deepEqual(
+            queries[0].where.User_Follows_id_followerToUser.Blocks_Blocks_id_blockedToUser,
+            NOT_BLOCKED_FILTER.Blocks_Blocks_id_blockedToUser
+        );
+        assert.equal(queries[0].take, 20);
+        assert.equal(queries[0].skip, 0);
     });
 
     it("should remove only the outgoing relationship", async () => {
-        const { repository, state } = seed();
-        state.follows.add(`${VIEWER_ID}|${OTHER_ID}`);
-        state.follows.add(`${OTHER_ID}|${VIEWER_ID}`);
-        assert.equal(await repository.removeFollow(VIEWER_ID, OTHER_ID), true);
-        assert.equal(state.follows.has(`${VIEWER_ID}|${OTHER_ID}`), false);
-        assert.equal(state.follows.has(`${OTHER_ID}|${VIEWER_ID}`), true);
+        const deletes = [];
+        const prisma = createFakePrisma({
+            follows: {
+                async deleteMany(args) {
+                    deletes.push({ model: "follows", args });
+                    return { count: 1 };
+                }
+            },
+            followRequests: {
+                async deleteMany(args) {
+                    deletes.push({ model: "followRequests", args });
+                    return { count: 0 };
+                }
+            }
+        });
+
+        const removed = await createFollowsRepository(prisma).removeFollow(VIEWER_ID, OTHER_ID);
+
+        assert.equal(removed, true);
+        assert.deepEqual(deletes[0], {
+            model: "follows",
+            args: { where: { id_follower: VIEWER_ID, id_followed: OTHER_ID } }
+        });
+        assert.deepEqual(deletes[1], {
+            model: "followRequests",
+            args: { where: { id_follower: VIEWER_ID, id_followed: OTHER_ID } }
+        });
     });
 
     it("should create a pending request when the target account is private", async () => {
-        const { repository, state } = seed();
-        state.users.get(OTHER_ID).is_private = true;
-        assert.equal(await repository.addFollow(VIEWER_ID, OTHER_ID), "pending");
-        assert.equal(state.requests.has(`${VIEWER_ID}|${OTHER_ID}`), true);
-        assert.equal(state.follows.has(`${VIEWER_ID}|${OTHER_ID}`), false);
+        const requestCalls = [];
+        const prisma = createFakePrisma({
+            user: {
+                async findFirst() {
+                    return { is_private: true };
+                }
+            },
+            followRequests: {
+                async createMany(args) {
+                    requestCalls.push(args);
+                    return { count: 1 };
+                }
+            }
+        });
+
+        const result = await createFollowsRepository(prisma).addFollow(VIEWER_ID, OTHER_ID);
+
+        assert.equal(result, "pending");
+        assert.deepEqual(requestCalls[0].data, [{ id_follower: VIEWER_ID, id_followed: OTHER_ID }]);
+    });
+
+    it("should skip the follow when the accepted request is blocked", async () => {
+        const createCalls = [];
+        const prisma = createFakePrisma({
+            followRequests: {
+                async deleteMany() {
+                    return { count: 1 };
+                }
+            },
+            blocks: {
+                async findFirst() {
+                    return { id_blocker: OTHER_ID };
+                }
+            },
+            follows: {
+                async createMany(args) {
+                    createCalls.push(args);
+                    return { count: 1 };
+                }
+            }
+        });
+
+        const resolved = await createFollowsRepository(prisma).resolveFollowRequest(VIEWER_ID, OTHER_ID, "accept");
+
+        assert.equal(resolved, false);
+        assert.equal(createCalls.length, 0);
+    });
+
+    it("should return null from updatePrivacy when the account is unavailable", async () => {
+        const prisma = createFakePrisma({
+            user: {
+                async update() {
+                    throw Object.assign(new Error("Record not found"), { code: "P2025" });
+                }
+            }
+        });
+
+        const saved = await createFollowsRepository(prisma).updatePrivacy(VIEWER_ID, true);
+
+        assert.equal(saved, null);
     });
 });

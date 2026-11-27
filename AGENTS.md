@@ -68,7 +68,7 @@
 - Usa Conventional Commits: `feat:`, `fix:`, `refactor:`, `conflicts:`, `config:`, `docs:`, `test:`, seguido de un mensaje breve en inglés.
 - Commitea cada tarea terminada. El trabajo sin commit se puede perder.
 - No hagas push sin autorización explícita.
-- Ramas: `feature/*`, `fix/*`, `refactor/*`, `exp/*`, `hotfix/*`. No modifiques `main` directamente; los cambios entran por Pull Request.
+- Ramas: `feat/*` o `feature/*`, `fix/*`, `refactor/*`, `exp/*`, `hotfix/*`. No modifiques `main` directamente; los cambios entran por Pull Request.
 - No fusiones ramas ni toques código de ramas ajenas sin aprobación.
 - Resuelve los conflictos revisando manualmente cada diferencia y verifica con las pruebas antes de hacer merge.
 - No subas `node_modules`, builds, ni archivos `.env`. Solo `.env.example`.

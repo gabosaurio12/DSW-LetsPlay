@@ -1,4 +1,4 @@
-const { createPool } = require("./db/pool");
+const { createPrismaClient } = require("./db/prisma");
 const { createVideogameRepository } = require("./repositories/videogameRepository");
 const { createCommentRepository } = require("./repositories/commentRepository");
 const { createReportRepository } = require("./repositories/reportRepository");
@@ -18,16 +18,16 @@ const { createApp, resolveAllowedOrigin } = require("./app");
  */
 function startServer() {
     const port = Number(process.env.PORT) || 3001;
-    const pool = createPool();
-    const videogameRepository = createVideogameRepository(pool);
-    const commentRepository = createCommentRepository(pool);
-    const reportRepository = createReportRepository(pool);
-    const lfgRepository = createLfgRepository(pool);
-    const authRepository = createAuthRepository(pool);
-    const gamerPreferencesRepository = createGamerPreferencesRepository(pool);
-    const followsRepository = createFollowsRepository(pool);
-    const blocksRepository = createBlocksRepository(pool);
-    const messagesRepository = createMessagesRepository(pool);
+    const prisma = createPrismaClient();
+    const videogameRepository = createVideogameRepository(prisma);
+    const commentRepository = createCommentRepository(prisma);
+    const reportRepository = createReportRepository(prisma);
+    const lfgRepository = createLfgRepository(prisma);
+    const authRepository = createAuthRepository(prisma);
+    const gamerPreferencesRepository = createGamerPreferencesRepository(prisma);
+    const followsRepository = createFollowsRepository(prisma);
+    const blocksRepository = createBlocksRepository(prisma);
+    const messagesRepository = createMessagesRepository(prisma);
     const messageHub = createMessageHub({
         authRepository,
         allowedOrigin: resolveAllowedOrigin()

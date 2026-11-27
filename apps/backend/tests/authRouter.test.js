@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const { createApp } = require("../src/app");
 const { hashSessionToken } = require("../src/auth/sessionToken");
 const { hashPassword, isPasswordWithinBcryptLimit } = require("../src/auth/passwordHasher");
+const { createAuthRepository } = require("../src/repositories/authRepository");
 
 const VALID_PASSWORD = "correct-horse-battery";
 const SESSION_COOKIE_PREFIX = "letsplay_session=";
@@ -304,5 +305,116 @@ describe("passwordHasher and session token helpers", () => {
 
     it("should store a session token hash that differs from the raw token", () => {
         assert.notEqual(hashSessionToken("raw-token"), "raw-token");
+    });
+});
+
+describe("authRepository", () => {
+    it("should match login identifiers literally when they contain LIKE wildcards", async () => {
+        const queries = [];
+        const prisma = {
+            user: {
+                async findFirst(args) {
+                    queries.push(args);
+                    return null;
+                }
+            }
+        };
+
+        const repository = createAuthRepository(prisma);
+        const account = await repository.findAccountByLogin("j_hn%");
+
+        assert.equal(account, null);
+        assert.deepEqual(queries[0].where.OR[0].username, { equals: "j\\_hn\\%", mode: "insensitive" });
+        assert.deepEqual(queries[0].where.OR[1].email, { equals: "j\\_hn\\%", mode: "insensitive" });
+    });
+
+    it("should return birth_date as YYYY-MM-DD when finding an account by login", async () => {
+        const prisma = {
+            user: {
+                async findFirst() {
+                    return {
+                        id_user: "11111111-1111-4111-8111-111111111111",
+                        username: "player_one",
+                        email: "player@example.com",
+                        birth_date: new Date("2000-05-17T00:00:00.000Z"),
+                        gender: "UNDEFINED",
+                        password_hash: "hash",
+                        account_status: "ACTIVE"
+                    };
+                }
+            }
+        };
+
+        const repository = createAuthRepository(prisma);
+        const account = await repository.findAccountByLogin("player_one");
+
+        assert.equal(account.birth_date, "2000-05-17");
+        assert.equal(account.password_hash, "hash");
+    });
+
+    it("should return null when the session token is unknown or expired", async () => {
+        const queries = [];
+        const prisma = {
+            activeSessions: {
+                async findFirst(args) {
+                    queries.push(args);
+                    return null;
+                }
+            }
+        };
+
+        const repository = createAuthRepository(prisma);
+        const user = await repository.findActiveSessionUser("unknown-hash");
+
+        assert.equal(user, null);
+        assert.equal(queries[0].where.token_hash, "unknown-hash");
+        assert.deepEqual(queries[0].where.User, { account_status: "ACTIVE" });
+        assert.ok(queries[0].where.expires_at.gt instanceof Date);
+    });
+
+    it("should create the account and its session in one transaction", async () => {
+        const created = [];
+        const prisma = {
+            async $transaction(work) {
+                return work(this);
+            },
+            user: {
+                async create(args) {
+                    created.push({ model: "user", args });
+                    return {
+                        id_user: args.data.id_user,
+                        username: args.data.username,
+                        email: args.data.email,
+                        birth_date: new Date("2001-02-03T00:00:00.000Z"),
+                        gender: args.data.gender
+                    };
+                }
+            },
+            activeSessions: {
+                async create(args) {
+                    created.push({ model: "session", args });
+                    return args.data;
+                }
+            }
+        };
+
+        const repository = createAuthRepository(prisma);
+        const account = await repository.createAccountWithSession(
+            {
+                username: "new_player",
+                email: "new@example.com",
+                birthDate: "2001-02-03",
+                gender: "OTHER",
+                passwordHash: "hash"
+            },
+            { tokenHash: "token-hash", expiresAt: new Date("2030-01-01T00:00:00.000Z") }
+        );
+
+        assert.equal(account.birth_date, "2001-02-03");
+        assert.equal(created[0].model, "user");
+        assert.equal(created[0].args.data.account_status, "ACTIVE");
+        assert.equal(created[1].model, "session");
+        assert.equal(created[1].args.data.id_user, account.id_user);
+        assert.equal(created[1].args.data.token_hash, "token-hash");
     });
 });

@@ -1,127 +1,134 @@
 const { randomUUID } = require("node:crypto");
 const { lockUserPair } = require("./userPairLock");
+const {
+    buildNotBlockedFilter,
+    isBlockedBetween
+} = require("./visibilityFilters");
 
-const PEER_COLUMNS = `
-    u."id_user", u."username", u."display_name", u."profile_photo_url", u."is_private"
-`;
+const PEER_SELECT = {
+    id_user: true,
+    username: true,
+    display_name: true,
+    profile_photo_url: true,
+    is_private: true
+};
 
-const FIND_VISIBLE_PEER_SQL = `
-SELECT ${PEER_COLUMNS}
-FROM "User" u
-WHERE u."id_user" = $1
-  AND u."account_status" = 'ACTIVE'
-  AND NOT EXISTS (
-    SELECT 1 FROM "Blocks" b
-    WHERE (b."id_blocker" = $2 AND b."id_blocked" = u."id_user")
-       OR (b."id_blocker" = u."id_user" AND b."id_blocked" = $2)
-  )
-`;
+const MESSAGE_SELECT = {
+    id_message: true,
+    id_sender: true,
+    id_recipient: true,
+    content: true,
+    sent_at: true
+};
 
-const FIND_SEND_STATE_SQL = `
-SELECT
-    (SELECT "is_private" FROM "User" WHERE "id_user" = $1) AS "sender_private",
-    r."is_private" AS "recipient_private",
-    r."account_status" AS "recipient_status",
-    EXISTS (
-        SELECT 1 FROM "Blocks"
-        WHERE ("id_blocker" = $1 AND "id_blocked" = $2)
-           OR ("id_blocker" = $2 AND "id_blocked" = $1)
-    ) AS "blocked",
-    EXISTS (
-        SELECT 1 FROM "Follows" WHERE "id_follower" = $1 AND "id_followed" = $2
-    ) AS "sender_follows",
-    EXISTS (
-        SELECT 1 FROM "Follows" WHERE "id_follower" = $2 AND "id_followed" = $1
-    ) AS "recipient_follows"
-FROM "User" r
-WHERE r."id_user" = $2
-`;
+const CONVERSATION_LIST_SELECT = {
+    id_conversation: true,
+    id_user_1: true,
+    User_Conversation_id_user_1ToUser: { select: PEER_SELECT },
+    User_Conversation_id_user_2ToUser: { select: PEER_SELECT },
+    Message: {
+        select: { id_sender: true, content: true, sent_at: true },
+        orderBy: [{ sent_at: "desc" }, { id_message: "desc" }],
+        take: 1
+    }
+};
 
-const UPSERT_CONVERSATION_SQL = `
-INSERT INTO "Conversation" ("id_conversation", "id_user_1", "id_user_2")
-VALUES ($1::uuid, LEAST($2::uuid, $3::uuid), GREATEST($2::uuid, $3::uuid))
-ON CONFLICT ("id_user_1", "id_user_2") DO UPDATE SET "id_user_1" = EXCLUDED."id_user_1"
-RETURNING "id_conversation"
-`;
+/**
+ * Orders two account ids the way Conversation stores them (id_user_1 before id_user_2).
+ *
+ * @param {string} firstUserId - One participant uuid.
+ * @param {string} secondUserId - The other participant uuid.
+ * @returns {{ id_user_1: string, id_user_2: string }} Stored pair of participants.
+ */
+function orderPair(firstUserId, secondUserId) {
+    const [userOneId, userTwoId] = [firstUserId, secondUserId].map((id) => id.toLowerCase()).sort();
+    return { id_user_1: userOneId, id_user_2: userTwoId };
+}
 
-const INSERT_MESSAGE_SQL = `
-INSERT INTO "Message" ("id_message", "id_conversation", "id_sender", "id_recipient", "content")
-VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5)
-RETURNING "id_message", "id_sender", "id_recipient", "content", "sent_at"
-`;
+/**
+ * Builds the filter for conversations of an account whose peer is active and not blocked.
+ *
+ * @param {string} userId - Account that owns the inbox.
+ * @returns {object} Prisma where clause.
+ */
+function buildConversationWhere(userId) {
+    return {
+        Message: { some: {} },
+        OR: [
+            {
+                id_user_1: userId,
+                User_Conversation_id_user_2ToUser: { account_status: "ACTIVE", ...buildNotBlockedFilter(userId) }
+            },
+            {
+                id_user_2: userId,
+                User_Conversation_id_user_1ToUser: { account_status: "ACTIVE", ...buildNotBlockedFilter(userId) }
+            }
+        ]
+    };
+}
 
-const LIST_CONVERSATIONS_SQL = `
-SELECT c."id_conversation", ${PEER_COLUMNS},
-       last."content" AS "last_content", last."sent_at" AS "last_sent_at",
-       last."id_sender" AS "last_sender_id"
-FROM "Conversation" c
-INNER JOIN "User" u ON u."id_user" = CASE
-    WHEN c."id_user_1" = $1::uuid THEN c."id_user_2"
-    ELSE c."id_user_1"
-END
-INNER JOIN LATERAL (
-    SELECT m."content", m."sent_at", m."id_sender"
-    FROM "Message" m
-    WHERE m."id_conversation" = c."id_conversation"
-    ORDER BY m."sent_at" DESC, m."id_message" DESC
-    LIMIT 1
-) last ON true
-WHERE (c."id_user_1" = $1::uuid OR c."id_user_2" = $1::uuid)
-  AND u."account_status" = 'ACTIVE'
-  AND NOT EXISTS (
-    SELECT 1 FROM "Blocks" b
-    WHERE (b."id_blocker" = $1::uuid AND b."id_blocked" = u."id_user")
-       OR (b."id_blocker" = u."id_user" AND b."id_blocked" = $1::uuid)
-  )
-ORDER BY last."sent_at" DESC, c."id_conversation" DESC
-LIMIT $2 OFFSET $3
-`;
+/**
+ * Converts a conversation row into the inbox shape, using the peer and the latest message.
+ *
+ * @param {object} conversation - Conversation row selected with CONVERSATION_LIST_SELECT.
+ * @param {string} userId - Account that owns the inbox.
+ * @returns {object} Inbox entry with peer fields and last message fields.
+ */
+function mapConversation(conversation, userId) {
+    const isFirstParticipant = conversation.id_user_1 === userId.toLowerCase();
+    const peer = isFirstParticipant
+        ? conversation.User_Conversation_id_user_2ToUser
+        : conversation.User_Conversation_id_user_1ToUser;
+    const [lastMessage] = conversation.Message;
 
-const COUNT_CONVERSATIONS_SQL = `
-SELECT count(*) FROM "Conversation" c
-INNER JOIN "User" u ON u."id_user" = CASE
-    WHEN c."id_user_1" = $1::uuid THEN c."id_user_2"
-    ELSE c."id_user_1"
-END
-WHERE (c."id_user_1" = $1::uuid OR c."id_user_2" = $1::uuid)
-  AND u."account_status" = 'ACTIVE'
-  AND EXISTS (SELECT 1 FROM "Message" m WHERE m."id_conversation" = c."id_conversation")
-  AND NOT EXISTS (
-    SELECT 1 FROM "Blocks" b
-    WHERE (b."id_blocker" = $1::uuid AND b."id_blocked" = u."id_user")
-       OR (b."id_blocker" = u."id_user" AND b."id_blocked" = $1::uuid)
-  )
-`;
+    return {
+        id_conversation: conversation.id_conversation,
+        ...peer,
+        last_content: lastMessage.content,
+        last_sent_at: lastMessage.sent_at,
+        last_sender_id: lastMessage.id_sender
+    };
+}
 
-const THREAD_FILTER_SQL = `
-FROM "Message" m
-INNER JOIN "Conversation" c ON c."id_conversation" = m."id_conversation"
-WHERE c."id_user_1" = LEAST($1::uuid, $2::uuid)
-  AND c."id_user_2" = GREATEST($1::uuid, $2::uuid)
-`;
+/**
+ * Sorts inbox entries by last message date, newest first, breaking ties by conversation id.
+ *
+ * @param {object} first - Inbox entry.
+ * @param {object} second - Inbox entry.
+ * @returns {number} Sort order for Array.prototype.sort.
+ */
+function compareNewestFirst(first, second) {
+    const byDate = second.last_sent_at - first.last_sent_at;
+    if (byDate !== 0) {
+        return byDate;
+    }
+    return first.id_conversation < second.id_conversation ? 1 : -1;
+}
 
-const LIST_THREAD_MESSAGES_SQL = `
-SELECT * FROM (
-    SELECT m."id_message", m."id_sender", m."id_recipient", m."content", m."sent_at"
-    ${THREAD_FILTER_SQL}
-    ORDER BY m."sent_at" DESC, m."id_message" DESC
-    LIMIT $3 OFFSET $4
-) recent
-ORDER BY "sent_at" ASC, "id_message" ASC
-`;
-
-const COUNT_THREAD_MESSAGES_SQL = `
-SELECT count(*) ${THREAD_FILTER_SQL}
-`;
+/**
+ * Checks whether the follower account follows the followed account.
+ *
+ * @param {import("@prisma/client").Prisma.TransactionClient} tx - Transaction client.
+ * @param {string} followerId - Follower account.
+ * @param {string} followedId - Followed account.
+ * @returns {Promise<boolean>} True when the follow exists.
+ */
+async function isFollowing(tx, followerId, followedId) {
+    const follow = await tx.follows.findUnique({
+        where: { id_follower_id_followed: { id_follower: followerId, id_followed: followedId } },
+        select: { id_follower: true }
+    });
+    return follow !== null;
+}
 
 /**
  * Creates the repository for private conversations and their messages. Every read
  * hides accounts blocked in either direction and deactivated accounts.
  *
- * @param {import("pg").Pool} pool - PostgreSQL connection pool.
+ * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance.
  * @returns {object} Message repository operations.
  */
-function createMessagesRepository(pool) {
+function createMessagesRepository(prisma) {
     /**
      * Finds an active peer that is not blocked with the viewer.
      *
@@ -130,27 +137,37 @@ function createMessagesRepository(pool) {
      * @returns {Promise<object|null>} The visible peer or null.
      */
     async function findVisiblePeer(peerId, viewerId) {
-        const result = await pool.query(FIND_VISIBLE_PEER_SQL, [peerId, viewerId]);
-        return result.rows[0] || null;
+        return prisma.user.findFirst({
+            where: { id_user: peerId, account_status: "ACTIVE", ...buildNotBlockedFilter(viewerId) },
+            select: PEER_SELECT
+        });
     }
 
     /**
      * Evaluates the rules that gate a send: recipient availability, blocks and
      * mutual follow when either account is private.
      *
-     * @param {import("pg").PoolClient} client - Transaction client holding the pair lock.
+     * @param {import("@prisma/client").Prisma.TransactionClient} tx - Transaction holding the pair lock.
      * @param {string} senderId - Account that sends the message.
      * @param {string} recipientId - Account that receives the message.
      * @returns {Promise<"allowed"|"unavailable"|"follow_required">} Send decision.
      */
-    async function evaluateSend(client, senderId, recipientId) {
-        const result = await client.query(FIND_SEND_STATE_SQL, [senderId, recipientId]);
-        const state = result.rows[0];
-        if (!state || state.recipient_status !== "ACTIVE" || state.blocked) {
+    async function evaluateSend(tx, senderId, recipientId) {
+        const [sender, recipient, blocked, senderFollows, recipientFollows] = await Promise.all([
+            tx.user.findUnique({ where: { id_user: senderId }, select: { is_private: true } }),
+            tx.user.findUnique({
+                where: { id_user: recipientId },
+                select: { is_private: true, account_status: true }
+            }),
+            isBlockedBetween(tx, senderId, recipientId),
+            isFollowing(tx, senderId, recipientId),
+            isFollowing(tx, recipientId, senderId)
+        ]);
+        if (!recipient || recipient.account_status !== "ACTIVE" || blocked) {
             return "unavailable";
         }
-        const requiresMutualFollow = state.sender_private || state.recipient_private;
-        if (requiresMutualFollow && !(state.sender_follows && state.recipient_follows)) {
+        const requiresMutualFollow = sender?.is_private || recipient.is_private;
+        if (requiresMutualFollow && !(senderFollows && recipientFollows)) {
             return "follow_required";
         }
         return "allowed";
@@ -167,35 +184,31 @@ function createMessagesRepository(pool) {
      * Send outcome.
      */
     async function sendMessage(senderId, recipientId, content) {
-        const client = await pool.connect();
-        try {
-            await client.query("BEGIN");
-            await lockUserPair(client, senderId, recipientId);
-            const decision = await evaluateSend(client, senderId, recipientId);
+        return prisma.$transaction(async (tx) => {
+            await lockUserPair(tx, senderId, recipientId);
+            const decision = await evaluateSend(tx, senderId, recipientId);
             if (decision !== "allowed") {
-                await client.query("ROLLBACK");
                 return { status: decision };
             }
-            const conversation = await client.query(UPSERT_CONVERSATION_SQL, [
-                randomUUID(),
-                senderId,
-                recipientId
-            ]);
-            const message = await client.query(INSERT_MESSAGE_SQL, [
-                randomUUID(),
-                conversation.rows[0].id_conversation,
-                senderId,
-                recipientId,
-                content
-            ]);
-            await client.query("COMMIT");
-            return { status: "sent", message: message.rows[0] };
-        } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-        } finally {
-            client.release();
-        }
+            const pair = orderPair(senderId, recipientId);
+            const conversation = await tx.conversation.upsert({
+                where: { id_user_1_id_user_2: pair },
+                create: { id_conversation: randomUUID(), ...pair },
+                update: {},
+                select: { id_conversation: true }
+            });
+            const message = await tx.message.create({
+                data: {
+                    id_message: randomUUID(),
+                    id_conversation: conversation.id_conversation,
+                    id_sender: senderId,
+                    id_recipient: recipientId,
+                    content
+                },
+                select: MESSAGE_SELECT
+            });
+            return { status: "sent", message };
+        });
     }
 
     /**
@@ -207,8 +220,15 @@ function createMessagesRepository(pool) {
      * @returns {Promise<Array<object>>} Conversations with peer and last message.
      */
     async function listConversations(userId, limit, offset) {
-        const result = await pool.query(LIST_CONVERSATIONS_SQL, [userId, limit, offset]);
-        return result.rows;
+        const conversations = await prisma.conversation.findMany({
+            where: buildConversationWhere(userId),
+            select: CONVERSATION_LIST_SELECT
+        });
+
+        return conversations
+            .map((conversation) => mapConversation(conversation, userId))
+            .sort(compareNewestFirst)
+            .slice(offset, offset + limit);
     }
 
     /**
@@ -218,8 +238,7 @@ function createMessagesRepository(pool) {
      * @returns {Promise<number>} Number of visible conversations.
      */
     async function countConversations(userId) {
-        const result = await pool.query(COUNT_CONVERSATIONS_SQL, [userId]);
-        return Number(result.rows[0].count);
+        return prisma.conversation.count({ where: buildConversationWhere(userId) });
     }
 
     /**
@@ -232,13 +251,14 @@ function createMessagesRepository(pool) {
      * @returns {Promise<Array<object>>} Messages in chronological order.
      */
     async function listThreadMessages(viewerId, peerId, limit, offset) {
-        const result = await pool.query(LIST_THREAD_MESSAGES_SQL, [
-            viewerId,
-            peerId,
-            limit,
-            offset
-        ]);
-        return result.rows;
+        const messages = await prisma.message.findMany({
+            where: { Conversation: orderPair(viewerId, peerId) },
+            select: MESSAGE_SELECT,
+            orderBy: [{ sent_at: "desc" }, { id_message: "desc" }],
+            skip: offset,
+            take: limit
+        });
+        return messages.toReversed();
     }
 
     /**
@@ -249,8 +269,7 @@ function createMessagesRepository(pool) {
      * @returns {Promise<number>} Message count.
      */
     async function countThreadMessages(viewerId, peerId) {
-        const result = await pool.query(COUNT_THREAD_MESSAGES_SQL, [viewerId, peerId]);
-        return Number(result.rows[0].count);
+        return prisma.message.count({ where: { Conversation: orderPair(viewerId, peerId) } });
     }
 
     return {

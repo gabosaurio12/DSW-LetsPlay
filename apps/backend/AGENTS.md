@@ -3,16 +3,19 @@
 Aplican también las reglas de `/AGENTS.md`. Este archivo añade las específicas del servidor.
 
 ## Stack y módulos
-- Express 5 y `pg`, con CommonJS (`require` y `module.exports`). No cambies a ESM sin aprobación.
+- Express 5 y Prisma (`@prisma/client`, `prisma/schema.prisma`), con CommonJS (`require` y `module.exports`). No cambies a ESM sin aprobación.
 
 ## Capas
 - `routes/`: solo HTTP. Valida la entrada, llama al repositorio y responde.
-- `repositories/`: todas las consultas SQL.
-- `db/pool.js`: la única conexión a PostgreSQL.
+- `repositories/`: todas las consultas a la base, con Prisma Client API.
+- `db/prisma.js`: la única conexión a PostgreSQL (`createPrismaClient`) y el helper `caseInsensitiveEquals`.
 
 ## Base de datos
-- Consultas parametrizadas (`$1`, `$2`…). Nunca concatenes entrada del usuario en SQL.
-- Las vistas que filtran por usuario requieren `SET LOCAL app.current_user_id` dentro de una transacción.
+- Consulta siempre con Prisma Client API (`findMany`, `create`, `upsert`, `$transaction`…). No escribas SQL.
+- Excepción aprobada: `SELECT ... FOR UPDATE` con `tx.$queryRaw` en plantilla etiquetada (`userPairLock.js`, `updatePrivacy`). Nunca concatenes entrada del usuario en SQL crudo.
+- Igualdad sin distinguir mayúsculas: usa `caseInsensitiveEquals`. Prisma la compila a `ILIKE`, donde `_` y `%` son comodines.
+- Visibilidad y bloqueos: usa `visibilityFilters.js`, no repitas filtros.
+- El esquema vive en `prisma/schema.prisma` y se genera con `db pull` desde la base de `database/`. No uses `prisma migrate`: las migraciones son de `database/`.
 - Imágenes y assets van a MongoDB, no a PostgreSQL.
 
 ## Entrada y archivos
@@ -27,6 +30,7 @@ Aplican también las reglas de `/AGENTS.md`. Este archivo añade las específica
 
 ## Configuración
 - Las variables de entorno van en `.env` local, que no se versiona. Solo `.env.example` se versiona.
+- La conexión se configura con `DATABASE_URL` (`postgresql://usuario:contraseña@host:puerto/base`).
 
 ## Pruebas
 - `npm test` en `apps/backend/` (`node --test`, archivos en `tests/`).
