@@ -3,13 +3,14 @@
 Memoria transversal entre sesiones. Máximo ~50 líneas. Memorias por carpeta: `apps/frontend/MEMORY.md`, `apps/backend/MEMORY.md`, `database/MEMORY.md`.
 
 ## Estado actual
-- Rama observada el 2026-11-27: `refactor/agents-files-reorder`. La memoria anterior hablaba de `Li0`; confirmar cuál es la rama de trabajo.
-- Cambios sin commit el 2026-11-27: reorganización de `AGENTS.md` y `MEMORY.md` por carpeta.
+- Rama `main` al día con `origin/main` (2026-11-27). PR #11 (AGENTS/MEMORY por carpeta) y PR #12 (LFG) fusionados.
+- Cambio sin commit el 2026-11-27: una línea nueva en `AGENTS.md` (Comentarios: priorizar no usar comentarios). Los commits los hace el usuario.
 - Tarea Trello #48 (registro, login y logout) completada en frontend.
 - Pendientes: #44 y #47 (`README.md`, `.env.example`) y #34 (modelo de presentación).
 - Prototipos Figma: archivo `Let-s-Play` (`YJ7S6DSebM5cZkSKu7j7Ek`).
-- Pendiente del usuario: rotar la clave de Context7 que está en `opencode.json`, que está versionado. No registrar la clave en ningún archivo.
+- Clave de Context7 rotada (2026-11-27). `opencode.json` ya no está en HEAD, pero sí quedó en el historial (commit `c55df8c`). No registrar claves en ningún archivo.
 - `.routing/` y `.tickets/` no existen en el repo. Sus referencias se eliminaron de la memoria.
+- `node_modules` y `dist` dejaron de estar versionados (2026-11-27, `git rm --cached`); ahora están en `.gitignore`.
 
 ## Decisiones (y por qué)
 - 2026-11-06: estructura `apps/frontend` + `apps/backend` definitiva. Queda pendiente cerrar la nota de `src-client`/`src-server`.

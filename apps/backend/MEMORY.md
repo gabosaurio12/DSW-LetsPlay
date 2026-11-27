@@ -3,10 +3,10 @@
 Memoria del servidor. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 
 ## Estado actual
-- Rutas en esta rama: `commentsRouter`, `reportsRouter`, `uploadsRouter`, `videogamesRouter`. Repositorios: `comment`, `report`, `videogame`.
-- `npm test` falla hoy: 0/4 con `Cannot find module '../src/app'` (verificado el 2026-11-27).
-- Faltan `src/app.js` y `src/server.js`. `package.json` ejecuta `node src/server.js`. Según el usuario, existen en otra rama con conflictos, pendiente de resolver.
-- La memoria anterior hablaba de 89/89 tests, incluidos endpoints LFG, perfil y encuesta. Esos endpoints no están en esta rama.
+- Rutas: `commentsRouter`, `lfgRouter`, `reportsRouter`, `uploadsRouter`, `videogamesRouter`. Repositorios: `comment`, `lfg`, `report`, `videogame`.
+- `src/app.js` y `src/server.js` presentes (antes figuraban como pendientes de otra rama).
+- `npm test`: 89/89 en verde (2026-11-27). Requiere `npm install` previo: faltaba `pg` en `node_modules`.
+- No hay endpoints de perfil ni de encuesta: el frontend los guarda en localStorage.
 - Tests de `/uploads` validan el tipo de archivo por magic bytes.
 - Puertos de desarrollo: backend `:3001`, frontend `:5173`, PostgreSQL contenedor `letsplay` en `:5439`.
 - Postgres se usa con `letsplay_admin`, porque `permissions.sql` no expone aún `CommunityVideogames` ni `CommunityMembers` a `letsplay_guest`.
@@ -22,6 +22,5 @@ Memoria del servidor. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas
 - No registrar `.env` en el repo; solo `.env.example`.
 
 ## Próximos pasos
-- Resolver el conflicto de la otra rama para traer `src/app.js` y `src/server.js`. No crearlos localmente.
-- Conectar los endpoints LFG y migrar la foto de perfil a MongoDB.
+- Migrar la foto de perfil a MongoDB; crear endpoints de perfil/encuesta si se decide dejar el localStorage.
 - Pendientes de docs: #44 y #47 (`README.md`, `.env.example`).
