@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { caseInsensitiveEquals } = require("../db/prisma");
 
 const ACCOUNT_SELECT = {
     id_user: true,
@@ -14,22 +15,7 @@ const LOGIN_ACCOUNT_SELECT = {
     account_status: true
 };
 
-const LIKE_SPECIAL_CHARACTERS = /[\\%_]/g;
 const BIRTH_DATE_LENGTH = 10;
-
-/**
- * Escapes LIKE wildcards so a case-insensitive equality compares the value literally.
- * Prisma compiles insensitive equality to ILIKE, where "_" would match any character.
- *
- * @param {string} value - Raw identifier sent by the client.
- * @returns {{ equals: string, mode: "insensitive" }} Prisma string filter.
- */
-function caseInsensitiveEquals(value) {
-    return {
-        equals: value.replace(LIKE_SPECIAL_CHARACTERS, "\\$&"),
-        mode: "insensitive"
-    };
-}
 
 /**
  * Converts a Prisma account row into the shape used by the auth routes, with birth_date as YYYY-MM-DD.

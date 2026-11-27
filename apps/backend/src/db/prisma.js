@@ -1,5 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 
+const LIKE_SPECIAL_CHARACTERS = /[\\%_]/g;
+
 /**
  * Creates the Prisma client used by every repository.
  *
@@ -19,6 +21,21 @@ function createPrismaClient(env = process.env) {
     });
 }
 
+/**
+ * Builds a case-insensitive exact-match string filter. Prisma compiles it to ILIKE,
+ * where "_" and "%" are wildcards, so they are escaped to keep the match literal.
+ *
+ * @param {string} value - Raw value to compare.
+ * @returns {{ equals: string, mode: "insensitive" }} Prisma string filter.
+ */
+function caseInsensitiveEquals(value) {
+    return {
+        equals: value.replace(LIKE_SPECIAL_CHARACTERS, "\\$&"),
+        mode: "insensitive"
+    };
+}
+
 module.exports = {
-    createPrismaClient
+    createPrismaClient,
+    caseInsensitiveEquals
 };
