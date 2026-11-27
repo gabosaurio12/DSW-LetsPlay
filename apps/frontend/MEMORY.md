@@ -6,7 +6,9 @@ Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 - Auth: `LoginForm`, `RegisterForm`, `RecoveryForm`, `AuthBrand` con `authService.js` (sesión en localStorage, seed `seth_play`). Logout en header y en `ProfileForm` (RF-88/89).
 - `App.jsx` (merge resuelto 2026-11-27): sin sesión → auth. Con sesión sin encuesta → `WelcomeSurvey`. Con encuesta completa → shell con `ExploreGames` por defecto. `/admin` también exige sesión y encuesta. Logout en el header del shell y del admin.
 - Encuesta: wizard géneros → plataformas → disponibilidad → resumen. Archivos: `welcomeSurveyData.js`, `welcomeSurveyService.js`, `WelcomeSurveyPanels`, `SurveyOptionChip`, `hooks/useTranslation`.
-- Páginas: `ExploreGames`, `GameDetail` (drag & drop), `ModerationPanel` (`/admin`).
+- Páginas: `ExploreGames`, `GameDetail` (drag & drop), `LfgSearch`, `ModerationPanel` (`/admin`).
+- Componentes nuevos: `PostComments`, `ReportModal`, `ProfileFormPanels`, `SelectableChip`.
+- `videogameService` (incluye uploads), `commentService`, `reportService` y `lfgService` consumen `/api/*` por el proxy de Vite a `:3001`. `authService`, `profileService` y `welcomeSurveyService` siguen en localStorage.
 - `npm run lint` limpio el 2026-11-27.
 
 ## Decisiones (y por qué)
@@ -25,6 +27,5 @@ Memoria del cliente. Reglas en `AGENTS.md` de esta carpeta. Máximo ~50 líneas.
 - En merges de i18n, el auto-merge de git dejó `profile` anidado dentro de `survey.errors` y un `}}};` final. Tras resolver, comprobar que `en.js` y `es.js` tengan las mismas claves (script de paridad) y no solo que el archivo compile.
 
 ## Próximos pasos
-- Commit del merge pendiente de confirmación.
 - Conectar `welcomeSurveyService` y `profileService` al backend.
 - Documentar la encuesta en RF y ajustar `ProfileForm` según esa decisión.

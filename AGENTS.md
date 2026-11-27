@@ -58,6 +58,7 @@
 - Registra errores con `console.error`. Usa `console.log` solo para depuración temporal.
 
 ## Comentarios
+- Prioriza el NO utilizar comentarios, el código debe explicarse por sí mismo.
 - Comenta solo el porqué de una decisión, y el cómo cuando no sea obvio. Nunca expliques qué hace el código.
 - Comentarios de una línea con `//`, en la línea anterior al código.
 - Comentarios de bloque `/* */` solo para soluciones poco comunes. Explica por qué no se usó la solución estándar.
