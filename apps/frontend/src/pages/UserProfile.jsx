@@ -24,6 +24,7 @@ const NOT_FOUND_STATUS = 404;
  * @param {string} props.currentUserId - Signed-in account uuid.
  * @param {() => void} props.onBack - Returns to the previous view.
  * @param {(userId: string) => void} props.onOpenProfile - Opens another profile.
+ * @param {(userId: string) => void} props.onOpenMessages - Opens the conversation with an account.
  * @param {() => void} props.onSessionExpired - Handles an expired session.
  * @returns {JSX.Element} The rendered profile page.
  */
@@ -33,6 +34,7 @@ function UserProfile({
     currentUserId,
     onBack,
     onOpenProfile,
+    onOpenMessages,
     onSessionExpired
 }) {
     const translate = useTranslation(language);
@@ -237,14 +239,15 @@ function UserProfile({
                                 </button>
                             )
                         )}
-                        <button
-                            type="button"
-                            className="user-profile-message"
-                            disabled
-                            title={translate("follows.states.comingSoon")}
-                        >
-                            {translate("follows.messageSoon")}
-                        </button>
+                        {!isSelf && (
+                            <button
+                                type="button"
+                                className="user-profile-message"
+                                onClick={() => onOpenMessages(profile.id_user)}
+                            >
+                                {translate("messages.sendMessage")}
+                            </button>
+                        )}
                     </div>
                 </div>
 

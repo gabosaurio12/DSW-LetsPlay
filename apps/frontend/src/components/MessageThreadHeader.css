@@ -1,0 +1,94 @@
+.message-thread-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--lp-border);
+}
+
+.message-thread-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: var(--lp-primary-tint);
+    color: var(--lp-primary-hover);
+    font-family: var(--lp-font-display);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.message-thread-identity {
+    min-width: 0;
+    flex: 1;
+}
+
+.message-thread-name {
+    margin: 0;
+    font-family: var(--lp-font-display);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--lp-text-primary);
+}
+
+.message-thread-handle {
+    margin: 0;
+    font-size: 13px;
+    color: var(--lp-text-secondary);
+}
+
+.message-thread-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.message-thread-block-button,
+.message-thread-block-action,
+.message-thread-block-cancel {
+    padding: 6px 14px;
+    border: 1px solid var(--lp-border);
+    border-radius: 999px;
+    background: var(--lp-surface);
+    color: var(--lp-text-primary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.message-thread-block-action {
+    background: var(--lp-primary);
+    border-color: var(--lp-primary);
+    color: var(--lp-surface);
+}
+
+.message-thread-block-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    max-width: 320px;
+}
+
+.message-thread-block-confirm p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--lp-text-secondary);
+}
+
+.message-thread-block-error {
+    margin: 0;
+    font-size: 13px;
+    color: var(--lp-primary-hover);
+}
+
+.message-thread-block-button:disabled,
+.message-thread-block-action:disabled,
+.message-thread-block-cancel:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
