@@ -1,54 +1,57 @@
 const crypto = require("node:crypto");
 
-const ACCOUNT_COLUMNS_SQL = `
-u."id_user", u."username", u."email", u."birth_date"::text AS "birth_date", u."gender"
-`;
+const ACCOUNT_SELECT = {
+    id_user: true,
+    username: true,
+    email: true,
+    birth_date: true,
+    gender: true
+};
 
-const FIND_ACCOUNT_BY_LOGIN_SQL = `
-SELECT ${ACCOUNT_COLUMNS_SQL}, u."password_hash", u."account_status"
-FROM "User" u
-WHERE lower(u."username") = lower($1)
-   OR lower(u."email") = lower($1)
-LIMIT 1
-`;
+const LOGIN_ACCOUNT_SELECT = {
+    ...ACCOUNT_SELECT,
+    password_hash: true,
+    account_status: true
+};
 
-const FIND_CONFLICTING_ACCOUNT_SQL = `
-SELECT u."id_user"
-FROM "User" u
-WHERE lower(u."username") = lower($1)
-   OR u."email" = $2
-LIMIT 1
-`;
-
-const INSERT_ACCOUNT_SQL = `
-INSERT INTO "User" ("id_user", "username", "email", "birth_date", "gender", "password_hash", "account_status")
-VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE')
-RETURNING "id_user", "username", "email", "birth_date"::text AS "birth_date", "gender"
-`;
-
-const INSERT_SESSION_SQL = `
-INSERT INTO "ActiveSessions" ("token_hash", "id_user", "expires_at")
-VALUES ($1, $2, $3)
-`;
-
-const FIND_ACTIVE_SESSION_USER_SQL = `
-SELECT ${ACCOUNT_COLUMNS_SQL}
-FROM "ActiveSessions" s
-INNER JOIN "User" u ON u."id_user" = s."id_user"
-WHERE s."token_hash" = $1
-  AND s."expires_at" > now()
-  AND u."account_status" = 'ACTIVE'
-`;
-
-const DELETE_SESSION_SQL = `
-DELETE FROM "ActiveSessions"
-WHERE "token_hash" = $1
-`;
+const LIKE_SPECIAL_CHARACTERS = /[\\%_]/g;
+const BIRTH_DATE_LENGTH = 10;
 
 /**
- * Creates the auth repository. It owns every SQL statement used for accounts and sessions.
+ * Escapes LIKE wildcards so a case-insensitive equality compares the value literally.
+ * Prisma compiles insensitive equality to ILIKE, where "_" would match any character.
  *
- * @param {import("pg").Pool} pool - PostgreSQL connection pool.
+ * @param {string} value - Raw identifier sent by the client.
+ * @returns {{ equals: string, mode: "insensitive" }} Prisma string filter.
+ */
+function caseInsensitiveEquals(value) {
+    return {
+        equals: value.replace(LIKE_SPECIAL_CHARACTERS, "\\$&"),
+        mode: "insensitive"
+    };
+}
+
+/**
+ * Converts a Prisma account row into the shape used by the auth routes, with birth_date as YYYY-MM-DD.
+ *
+ * @param {object|null} account - Account row selected with ACCOUNT_SELECT or LOGIN_ACCOUNT_SELECT.
+ * @returns {object|null} Account with a string birth_date, or null when there is no account.
+ */
+function mapAccount(account) {
+    if (!account) {
+        return null;
+    }
+
+    return {
+        ...account,
+        birth_date: account.birth_date.toISOString().slice(0, BIRTH_DATE_LENGTH)
+    };
+}
+
+/**
+ * Creates the auth repository. It owns every query used for accounts and sessions.
+ *
+ * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance.
  * @returns {{
  *   findAccountByLogin: Function,
  *   findConflictingAccount: Function,
@@ -58,51 +61,85 @@ WHERE "token_hash" = $1
  *   deleteSession: Function
  * }} Auth repository operations.
  */
-function createAuthRepository(pool) {
+function createAuthRepository(prisma) {
     async function findAccountByLogin(identifier) {
-        const result = await pool.query(FIND_ACCOUNT_BY_LOGIN_SQL, [identifier]);
-        return result.rows[0] || null;
+        const account = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { username: caseInsensitiveEquals(identifier) },
+                    { email: caseInsensitiveEquals(identifier) }
+                ]
+            },
+            select: LOGIN_ACCOUNT_SELECT
+        });
+        return mapAccount(account);
     }
 
     async function findConflictingAccount(username, email) {
-        const result = await pool.query(FIND_CONFLICTING_ACCOUNT_SQL, [username, email]);
-        return result.rows[0] || null;
+        return prisma.user.findFirst({
+            where: {
+                OR: [{ username: caseInsensitiveEquals(username) }, { email }]
+            },
+            select: { id_user: true }
+        });
     }
 
+    /**
+     * Creates an account and its first session in one transaction.
+     *
+     * @param {{ username: string, email: string, birthDate: string, gender: string, passwordHash: string }} account - Account data.
+     * @param {{ tokenHash: string, expiresAt: Date }} session - Session data.
+     * @returns {Promise<object>} The created account row.
+     */
     async function createAccountWithSession(account, session) {
-        const client = await pool.connect();
-        try {
-            await client.query("BEGIN");
-            const result = await client.query(INSERT_ACCOUNT_SQL, [
-                crypto.randomUUID(),
-                account.username,
-                account.email,
-                account.birthDate,
-                account.gender,
-                account.passwordHash
-            ]);
-            await client.query(INSERT_SESSION_SQL, [session.tokenHash, result.rows[0].id_user, session.expiresAt]);
-            await client.query("COMMIT");
-            return result.rows[0];
-        } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-        } finally {
-            client.release();
-        }
+        return prisma.$transaction(async (tx) => {
+            const user = await tx.user.create({
+                data: {
+                    id_user: crypto.randomUUID(),
+                    username: account.username,
+                    email: account.email,
+                    birth_date: new Date(account.birthDate),
+                    gender: account.gender,
+                    password_hash: account.passwordHash,
+                    account_status: "ACTIVE"
+                },
+                select: ACCOUNT_SELECT
+            });
+            await tx.activeSessions.create({
+                data: {
+                    token_hash: session.tokenHash,
+                    id_user: user.id_user,
+                    expires_at: session.expiresAt
+                }
+            });
+            return mapAccount(user);
+        });
     }
 
     async function createSession(userId, session) {
-        await pool.query(INSERT_SESSION_SQL, [session.tokenHash, userId, session.expiresAt]);
+        await prisma.activeSessions.create({
+            data: {
+                token_hash: session.tokenHash,
+                id_user: userId,
+                expires_at: session.expiresAt
+            }
+        });
     }
 
     async function findActiveSessionUser(tokenHash) {
-        const result = await pool.query(FIND_ACTIVE_SESSION_USER_SQL, [tokenHash]);
-        return result.rows[0] || null;
+        const session = await prisma.activeSessions.findFirst({
+            where: {
+                token_hash: tokenHash,
+                expires_at: { gt: new Date() },
+                User: { account_status: "ACTIVE" }
+            },
+            select: { User: { select: ACCOUNT_SELECT } }
+        });
+        return mapAccount(session?.User ?? null);
     }
 
     async function deleteSession(tokenHash) {
-        await pool.query(DELETE_SESSION_SQL, [tokenHash]);
+        await prisma.activeSessions.deleteMany({ where: { token_hash: tokenHash } });
     }
 
     return {

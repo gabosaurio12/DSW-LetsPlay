@@ -19,7 +19,7 @@ const {
     buildExpiredSessionCookie
 } = require("../auth/sessionCookie");
 
-const UNIQUE_VIOLATION_CODE = "23505";
+const UNIQUE_VIOLATION_CODE = "P2002";
 const LOGIN_MAX_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
